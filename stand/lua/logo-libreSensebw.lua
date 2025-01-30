@@ -29,14 +29,14 @@
 
 local drawer = require("drawer")
 
-local pfSensebw = {
+local libreSensebw = {
 	"                               ",
 	"   _________________________   ",
-	"  /       __          __     \\ ",
-	" |      \\  \\      /   /    |",
-	" |       \\  \\    /   /     |",
-	" |        \\  \\  /   /      |",
-	" |         \\  \\/   /       |",
+	"  /       __         __      \\ ",
+	" |      \\  \\      /  /     |",
+	" |       \\  \\    /  /      |",
+	" |        \\  \\  /  /       |",
+	" |         \\  \\/  /        |",
 	" |          \\     /         |",
 	" |           \\   /          |",
 	" |            |   |          |",
@@ -47,8 +47,8 @@ local pfSensebw = {
 	"                               "
 	}
 
-drawer.addLogo("pfSensebw", {
-	graphic = pfSensebw,
+drawer.addLogo("libreSensebw", {
+	graphic = libreSensebw,
 	shift = {x = 2, y = 4},
 })
 

@@ -29,27 +29,19 @@
 
 local drawer = require("drawer")
 
-local pfSensebw = {
-	"                               ",
-	"   _________________________   ",
-	"  /       __          __     \\ ",
-	" |      \\  \\      /   /    |",
-	" |       \\  \\    /   /     |",
-	" |        \\  \\  /   /      |",
-	" |         \\  \\/   /       |",
-	" |          \\     /         |",
-	" |           \\   /          |",
-	" |            |   |          |",
-	" |            |   |          |",
-	" |            |   |          |",
-	" |             ___           |",
-	"  \_________________________/  ",
-	"                               "
+local libreSense_brand = {
+	"  ___     __                                   ",
+	" \\  \\  / /     ___  ___ _ __  ___  ___       ",
+	"  \\  \\/ /     / __|/ _ \\ '_ \\/ __|/ _ \\     ",
+	"   \\    /     \\__ \\  __/ | | \\__ \\  __/     ",
+	"     /  /       |___/\\___|_| |_|___/\\___|      ",
+	"    /  /                                        ",
+	"   /__/                                         "
 	}
 
-drawer.addLogo("pfSensebw", {
-	graphic = pfSensebw,
-	shift = {x = 2, y = 4},
+drawer.addBrand("libreSense", {
+	graphic = libreSense_brand,
+	shift = {x = 0, y = 0},
 })
 
 return true
