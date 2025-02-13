@@ -62,8 +62,6 @@
 #include <zfs_fletcher.h>
 #include <libzutil.h>
 
-#define TEXT_DOMAIN "zfs"
-
 /*
  * We only care about the scheme in order to match the scheme
  * with the handler. Each handler should validate the full URI

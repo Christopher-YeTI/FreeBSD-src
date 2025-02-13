@@ -67,8 +67,6 @@
 #include "libzfs_impl.h"
 #include "zfs_deleg.h"
 
-#define TEXT_DOMAIN "zfs"
-
 static __thread struct passwd gpwd;
 static __thread struct group ggrp;
 static __thread char rpbuf[2048];

@@ -32,7 +32,6 @@
 #include <sys/stat.h>
 #include <sys/param.h>
 
-#define TEXT_DOMAIN "zfs"
 #ifdef IN_BASE
 #define	ZFS_KMOD	"zfs"
 #else

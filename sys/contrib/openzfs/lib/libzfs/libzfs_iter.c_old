@@ -38,8 +38,6 @@
 
 #include "libzfs_impl.h"
 
-#define TEXT_DOMAIN "zfs"
-
 static int
 zfs_iter_clones(zfs_handle_t *zhp, int flags __maybe_unused, zfs_iter_f func,
     void *data)
