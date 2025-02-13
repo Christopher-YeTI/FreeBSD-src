@@ -47,8 +47,6 @@
 #include <libzutil.h>
 #include "libzfs_impl.h"
 
-#define TEXT_DOMAIN "zfs"
-
 #define	ZDIFF_SNAPDIR		"/.zfs/snapshot/"
 #define	ZDIFF_PREFIX		"zfs-diff-%d"
 

@@ -50,6 +50,8 @@
 
 #include "libzfs_impl.h"
 
+#define TEXT_DOMAIN "zfs"
+
 typedef struct config_node {
 	char		*cn_name;
 	nvlist_t	*cn_config;

@@ -56,7 +56,6 @@
  *	zpool_disable_datasets()
  */
 
-
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -82,9 +81,6 @@
 
 #include <libshare.h>
 #include <sys/systeminfo.h>
-
-#define TEXT_DOMAIN "zfs"
-
 #define	MAXISALEN	257	/* based on sysinfo(2) man page */
 
 static void zfs_mount_task(void *);
