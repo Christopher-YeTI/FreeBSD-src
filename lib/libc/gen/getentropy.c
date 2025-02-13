@@ -36,6 +36,10 @@
 
 #include "libc_private.h"
 
+#ifndef GETENTROPY_MAX
+#define GETENTROPY_MAX 256  // Valor padrão no FreeBSD
+#endif
+
 static inline void
 _getentropy_fail(void)
 {
