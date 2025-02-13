@@ -50,7 +50,6 @@
 #ifdef HAVE_AIO_H
 #include <aio.h>
 #endif
-#define TEXT_DOMAIN "zfs"
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
