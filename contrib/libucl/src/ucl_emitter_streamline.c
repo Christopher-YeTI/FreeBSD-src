@@ -110,11 +110,11 @@ ucl_object_emit_streamline_start_container (struct ucl_emitter_context *ctx,
 		st->obj = obj;
 		if (obj != NULL && obj->type == UCL_ARRAY) {
 			st->is_array = true;
-			sctx->ops->ucl_emitter_start_array (ctx, obj, print_key, NULL);
+			sctx->ops->ucl_emitter_start_array (ctx, obj, print_key, 0);
 		}
 		else {
 			st->is_array = false;
-			sctx->ops->ucl_emitter_start_object (ctx, obj, print_key, NULL);
+			sctx->ops->ucl_emitter_start_object (ctx, obj, print_key, 0);
 		}
 		LL_PREPEND (sctx->containers, st);
 	}
