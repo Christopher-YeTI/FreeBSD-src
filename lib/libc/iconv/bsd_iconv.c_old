@@ -29,14 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef ICONV_GET_ILSEQ_INVALID
-#define ICONV_GET_ILSEQ_INVALID 0
-#endif
-
-#ifndef ICONV_SET_ILSEQ_INVALID
-#define ICONV_SET_ILSEQ_INVALID 1
-#endif
-
 #include <sys/queue.h>
 #include <sys/types.h>
 
@@ -156,7 +148,8 @@ __bsd___iconv(iconv_t handle, char **in, size_t *szin, char **out,
 	return (ret);
 }
 
-int __bsd___iconv_get_list(char ***rlist, size_t *rsz, int sorted)
+int
+__bsd___iconv_get_list(char ***rlist, size_t *rsz, bool sorted)
 {
 	int ret;
 
