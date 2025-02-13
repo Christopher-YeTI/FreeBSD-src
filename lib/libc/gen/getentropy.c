@@ -30,7 +30,6 @@
 #include <sys/random.h>
 
 #include <errno.h>
-#include <limits.h>
 #include <signal.h>
 #include <unistd.h>
 #include <ssp/ssp.h>
@@ -48,8 +47,8 @@ __ssp_real(getentropy)(void *buf, size_t buflen)
 {
 	ssize_t rd;
 
-	if (buflen > GETENTROPY_MAX) {
-		errno = EINVAL;
+	if (buflen > 256) {
+		errno = EIO;
 		return (-1);
 	}
 

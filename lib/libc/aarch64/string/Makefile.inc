@@ -4,6 +4,7 @@
 #
 
 AARCH64_STRING_FUNCS= \
+	memchr \
 	memcmp \
 	memcpy \
 	memmove \
@@ -12,29 +13,12 @@ AARCH64_STRING_FUNCS= \
 	stpcpy \
 	strchr \
 	strchrnul \
+	strcmp \
 	strcpy \
+	strlen \
+	strncmp \
 	strnlen \
 	strrchr
-
-# SIMD-enhanced routines not derived from Arm's code
-MDSRCS+= \
-	memchr.S \
-	strcmp.S \
-	strspn.S \
-	strcspn.S \
-	strpbrk.c \
-	strsep.c \
-	strcat.c \
-	strlcpy.S \
-	strncmp.S \
-	memccpy.S \
-	strncat.c \
-	strlcat.c \
-	strlen.S \
-	timingsafe_bcmp.S \
-	timingsafe_memcmp.S \
-	bcopy.c \
-	bzero.c
 
 #
 # Add the above functions. Generate an asm file that includes the needed
@@ -54,7 +38,3 @@ CLEANFILES+=	${FUNC}.S
 MDSRCS+=	${FUNC}.S
 CFLAGS.${FUNC}.S+=-I${SRCTOP}/contrib/arm-optimized-routines/string
 .endfor
-
-# memchr.S is a wrapper in the src tree for the implementation from
-# arm-optimized-routines
-CFLAGS.memchr.S+=-I${SRCTOP}/contrib/arm-optimized-routines/string

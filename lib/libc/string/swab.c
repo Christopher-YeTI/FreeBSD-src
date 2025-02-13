@@ -4,22 +4,19 @@
  */
 
 #include <unistd.h>
-#include <sys/endian.h>
 
 void
 swab(const void * __restrict from, void * __restrict to, ssize_t len)
 {
-	const uint16_t *f __aligned(1) = from;
-	uint16_t *t __aligned(1) = to;
+	const unsigned char *f = from;
+	unsigned char *t = to;
 
-	/*
-	 * POSIX says overlapping copy behavior is undefined, however many
-	 * applications assume the old FreeBSD and current GNU libc behavior
-	 * that will swap the bytes correctly when from == to. Reading both bytes
-	 * and swapping them before writing them back accomplishes this.
-	 */
 	while (len > 1) {
-		*t++ = bswap16(*f++);
+		t[0] = f[1];
+		t[1] = f[0];
+
+		f += 2;
+		t += 2;
 		len -= 2;
 	}
 }
