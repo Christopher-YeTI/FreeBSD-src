@@ -30,11 +30,11 @@
  */
 
 #ifndef ICONV_GET_ILSEQ_INVALID
-#define ICONV_GET_ILSEQ_INVALID 0
+#define ICONV_GET_ILSEQ_INVALID 100
 #endif
 
 #ifndef ICONV_SET_ILSEQ_INVALID
-#define ICONV_SET_ILSEQ_INVALID 1
+#define ICONV_SET_ILSEQ_INVALID 101
 #endif
 
 #include <sys/queue.h>
