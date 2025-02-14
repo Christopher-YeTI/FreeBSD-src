@@ -72,9 +72,6 @@
 #include <zfs_prop.h>
 #include <zfs_deleg.h>
 #include <libzutil.h>
-
-#define TEXT_DOMAIN "zfs"
-
 #ifdef HAVE_IDMAP
 #include <aclutils.h>
 #include <directory.h>
