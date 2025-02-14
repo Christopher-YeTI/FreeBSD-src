@@ -79,8 +79,6 @@
 
 #include "statcommon.h"
 
-#define TEXT_DOMAIN "zfs"
-
 libzfs_handle_t *g_zfs;
 
 static int mount_tp_nthr = 512;  /* tpool threads for multi-threaded mounting */
