@@ -1,5 +1,3 @@
-LDLIBS+= -lintl
-
 sbin_PROGRAMS   += zfs
 CPPCHECKTARGETS += zfs
 
