@@ -1,7 +1,3 @@
-LDFLAGS+= -L/usr/local/lib -lintl
-LDLIBS+= -lintl
-CFLAGS+= -I/usr/local/include
-
 bin_SCRIPTS =
 bin_PROGRAMS =
 sbin_SCRIPTS =
