@@ -23,9 +23,7 @@
  * Copyright (c) 2017, Intle Corporation. All rights reserved.
  */
 
-LDFLAGS+= -L/usr/local/lib -lintl
-LDLIBS+= -lintl
-CFLAGS+= -I/usr/local/include
+
 
 #include <errno.h>
 #include <getopt.h>
