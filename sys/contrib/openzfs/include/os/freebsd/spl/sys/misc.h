@@ -45,12 +45,14 @@
 #define	F_SEEK_HOLE	FIOSEEKHOLE
 
 struct opensolaris_utsname {
-	const char	*sysname;
-	const char	*nodename;
-	const char	*release;
-	char		version[32];
-	const char	*machine;
+	char	*sysname;
+	char	*nodename;
+	char	*release;
+	char	version[32];
+	char	*machine;
 };
+
+extern char hw_serial[11];
 
 #define	task_io_account_read(n)
 #define	task_io_account_write(n)

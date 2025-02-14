@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -25,7 +25,8 @@
  */
 
 #ifndef	_AVL_IMPL_H
-#define	_AVL_IMPL_H extern __attribute__((visibility("default")))
+#define	_AVL_IMPL_H
+
 
 
 /*
@@ -34,7 +35,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/sysmacros.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -148,16 +148,14 @@ struct avl_tree {
 	int (*avl_compar)(const void *, const void *);
 	size_t avl_offset;		/* offsetof(type, avl_link_t field) */
 	ulong_t avl_numnodes;		/* number of nodes in the tree */
-#ifndef _KERNEL
-	size_t avl_pad;			/* For backwards ABI compatibility. */
-#endif
+	size_t avl_size;		/* sizeof user type struct */
 };
 
 
 /*
  * This will only by used via AVL_NEXT() or AVL_PREV()
  */
-_AVL_IMPL_H void *avl_walk(struct avl_tree *, void *, int);
+extern void *avl_walk(struct avl_tree *, void *, int);
 
 #ifdef	__cplusplus
 }

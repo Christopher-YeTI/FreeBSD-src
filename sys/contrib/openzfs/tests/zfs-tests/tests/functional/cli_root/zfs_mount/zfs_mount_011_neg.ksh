@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -45,11 +45,12 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists $TESTPOOL/$TESTFS@$TESTSNAP && \
-		destroy_dataset $TESTPOOL/$TESTFS@$TESTSNAP
+	if snapexists $TESTPOOL/$TESTFS@$TESTSNAP; then
+		log_must_busy zfs destroy $TESTPOOL/$TESTFS@$TESTSNAP
+	fi
 
 	if is_global_zone && datasetexists $TESTPOOL/$TESTVOL; then
-		destroy_dataset $TESTPOOL/$TESTVOL
+		log_must_busy zfs destroy $TESTPOOL/$TESTVOL
 	fi
 }
 

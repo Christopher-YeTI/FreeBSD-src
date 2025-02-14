@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,7 +48,8 @@ function cleanup
 	typeset snap f
 
 	for snap in $snap1 $snap2 $snap3; do
-		snapexists $snap && destroy_dataset $snap -f
+		snapexists $snap && \
+			log_must zfs destroy -f $snap
 	done
 
 	for f in $tmpfile1 $tmpfile2; do
@@ -95,7 +96,7 @@ log_must zfs snapshot $snap3
 typeset -i i=0
 while (( i < ${#badargs[*]} ))
 do
-	log_mustnot eval "zfs send ${badargs[i]} > /dev/null"
+	log_mustnot eval "zfs send ${badargs[i]} >$TEST_BASE_DIR/devnull"
 
 	(( i = i + 1 ))
 done

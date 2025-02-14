@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -65,7 +65,10 @@ log_must zpool export $TESTPOOL
 metaslabs=0
 bs=512
 zdb -p $TESTDIR -Pme $TESTPOOL | awk '/metaslab[ ]+[0-9]+/ { print $4, $8 }' |
-while read -r offset size; do
+while read -r offset_size; do
+	typeset offset=$(echo $offset_size | cut -d ' ' -f1)
+	typeset size=$(echo $offset_size | cut -d ' ' -f2)
+
 	log_note "offset: '$offset'"
 	log_note "size: '$size'"
 
@@ -76,7 +79,7 @@ while read -r offset size; do
 	# Note we use '-t x4' instead of '-t x8' here because x8 is not
 	# a supported format on FreeBSD.
 	dd if=$SMALLFILE skip=$((offset / bs)) count=$((size / bs)) bs=$bs |
-	    od -t x4 -Ad | grep -qE "deadbeef +deadbeef +deadbeef +deadbeef" ||
+	    od -t x4 -Ad | egrep -q "deadbeef +deadbeef +deadbeef +deadbeef" ||
 	    log_fail "Pattern not found in metaslab free space"
 done
 

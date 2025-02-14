@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -49,7 +49,7 @@ function cleanup
 	[[ -f $tmpfile ]] && rm -f $tmpfile
 	[[ -f $tmpfile2 ]] && rm -f $tmpfile2
 	for dataset in $fs $newfs $fsclone $vol $newvol $volclone; do
-		datasetexists $dataset && destroy_dataset $dataset -Rf
+		datasetexists $dataset && zfs destroy -Rf $dataset
 	done
 	rm -rf /history.$$
 }

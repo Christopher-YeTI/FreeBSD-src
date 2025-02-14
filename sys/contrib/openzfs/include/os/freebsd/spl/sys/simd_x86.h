@@ -45,10 +45,6 @@
 		fpu_kern_enter(curthread, NULL, FPU_KERN_NOCTX);\
 }
 
-#ifndef PCB_FPUNOSAVE
-#define	PCB_FPUNOSAVE	PCB_NPXNOSAVE
-#endif
-
 #define	kfpu_end()	{			\
 	if (__predict_false(curpcb->pcb_flags & PCB_FPUNOSAVE))	\
 		fpu_kern_leave(curthread, NULL);	\
@@ -81,7 +77,7 @@ __simd_state_enabled(const uint64_t state)
 	boolean_t has_osxsave;
 	uint64_t xcr0;
 
-	has_osxsave = (cpu_feature2 & CPUID2_OSXSAVE) != 0;
+	has_osxsave = !!(cpu_feature2 & CPUID2_OSXSAVE);
 
 	if (!has_osxsave)
 		return (B_FALSE);
@@ -103,7 +99,7 @@ __simd_state_enabled(const uint64_t state)
 static inline boolean_t
 zfs_sse_available(void)
 {
-	return ((cpu_feature & CPUID_SSE) != 0);
+	return (!!(cpu_feature & CPUID_SSE));
 }
 
 /*
@@ -112,7 +108,7 @@ zfs_sse_available(void)
 static inline boolean_t
 zfs_sse2_available(void)
 {
-	return ((cpu_feature & CPUID_SSE2) != 0);
+	return (!!(cpu_feature & CPUID_SSE2));
 }
 
 /*
@@ -121,7 +117,7 @@ zfs_sse2_available(void)
 static inline boolean_t
 zfs_sse3_available(void)
 {
-	return ((cpu_feature2 & CPUID2_SSE3) != 0);
+	return (!!(cpu_feature2 & CPUID2_SSE3));
 }
 
 /*
@@ -130,7 +126,7 @@ zfs_sse3_available(void)
 static inline boolean_t
 zfs_ssse3_available(void)
 {
-	return ((cpu_feature2 & CPUID2_SSSE3) != 0);
+	return (!!(cpu_feature2 & CPUID2_SSSE3));
 }
 
 /*
@@ -139,7 +135,7 @@ zfs_ssse3_available(void)
 static inline boolean_t
 zfs_sse4_1_available(void)
 {
-	return ((cpu_feature2 & CPUID2_SSE41) != 0);
+	return (!!(cpu_feature2 & CPUID2_SSE41));
 }
 
 /*
@@ -148,7 +144,7 @@ zfs_sse4_1_available(void)
 static inline boolean_t
 zfs_sse4_2_available(void)
 {
-	return ((cpu_feature2 & CPUID2_SSE42) != 0);
+	return (!!(cpu_feature2 & CPUID2_SSE42));
 }
 
 /*
@@ -159,7 +155,7 @@ zfs_avx_available(void)
 {
 	boolean_t has_avx;
 
-	has_avx = (cpu_feature2 & CPUID2_AVX) != 0;
+	has_avx = !!(cpu_feature2 & CPUID2_AVX);
 
 	return (has_avx && __ymm_enabled());
 }
@@ -172,22 +168,9 @@ zfs_avx2_available(void)
 {
 	boolean_t has_avx2;
 
-	has_avx2 = (cpu_stdext_feature & CPUID_STDEXT_AVX2) != 0;
+	has_avx2 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX2);
 
 	return (has_avx2 && __ymm_enabled());
-}
-
-/*
- * Check if SHA_NI instruction set is available
- */
-static inline boolean_t
-zfs_shani_available(void)
-{
-	boolean_t has_shani;
-
-	has_shani = (cpu_stdext_feature & CPUID_STDEXT_SHA) != 0;
-
-	return (has_shani && __ymm_enabled());
 }
 
 /*
@@ -213,7 +196,7 @@ zfs_avx512f_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -224,8 +207,8 @@ zfs_avx512cd_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_AVX512CD) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_AVX512CD);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -236,8 +219,8 @@ zfs_avx512er_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_AVX512CD) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_AVX512CD);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -248,8 +231,8 @@ zfs_avx512pf_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_AVX512PF) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_AVX512PF);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -260,7 +243,7 @@ zfs_avx512bw_available(void)
 {
 	boolean_t has_avx512 = B_FALSE;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512BW) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512BW);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -271,8 +254,8 @@ zfs_avx512dq_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_AVX512DQ) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_AVX512DQ);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -283,8 +266,8 @@ zfs_avx512vl_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_AVX512VL) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_AVX512VL);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -295,8 +278,8 @@ zfs_avx512ifma_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_AVX512IFMA) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_AVX512IFMA);
 
 	return (has_avx512 && __zmm_enabled());
 }
@@ -307,8 +290,8 @@ zfs_avx512vbmi_available(void)
 {
 	boolean_t has_avx512;
 
-	has_avx512 = (cpu_stdext_feature & CPUID_STDEXT_AVX512F) != 0 &&
-	    (cpu_stdext_feature & CPUID_STDEXT_BMI1) != 0;
+	has_avx512 = !!(cpu_stdext_feature & CPUID_STDEXT_AVX512F) &&
+	    !!(cpu_stdext_feature & CPUID_STDEXT_BMI1);
 
 	return (has_avx512 && __zmm_enabled());
 }

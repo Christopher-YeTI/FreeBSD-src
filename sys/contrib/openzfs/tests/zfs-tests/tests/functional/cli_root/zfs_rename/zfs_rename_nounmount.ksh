@@ -39,7 +39,7 @@ function rename_cleanup
 	zfs destroy -fR $TESTPOOL/renamed
 }
 
-back=$PWD
+back=$(pwd)
 log_onexit rename_cleanup
 
 log_must zfs create $TESTPOOL/rename_test
@@ -72,15 +72,14 @@ log_must zfs list $TESTPOOL/renamed
 log_must zfs list $TESTPOOL/renamed/child
 log_must zfs list $TESTPOOL/renamed/child/grandchild
 
-missing=$(zfs mount | awk \
-    -v genpat=$TESTPOOL/renamed \
+missing=$(zfs mount | awk -v pat=$TESTPOOL/renamed '$1 ~ pat' | awk \
     -v mntp_p=$mntp_p \
     -v mntp_c=$mntp_c \
     -v mntp_g=$mntp_g '
     BEGIN { p = c = g = 0 }
-    $1 ~ genpat && $2 == mntp_p { p = 1 }
-    $1 ~ genpat && $2 == mntp_c { c = 1 }
-    $1 ~ genpat && $2 == mntp_g { g = 1 }
+    $2 == mntp_p { p = 1 }
+    $2 == mntp_c { c = 1 }
+    $2 == mntp_g { g = 1 }
     END {
 	if (p != 1)
 		print mntp_p

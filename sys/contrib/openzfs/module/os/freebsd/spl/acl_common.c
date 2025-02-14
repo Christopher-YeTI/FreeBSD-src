@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -37,11 +37,13 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <strings.h>
 #include <unistd.h>
 #include <assert.h>
 #include <grp.h>
 #include <pwd.h>
 #include <acl_common.h>
+#define	ASSERT	assert
 #endif
 
 #define	ACE_POSIX_SUPPORTED_BITS (ACE_READ_DATA | \
@@ -168,9 +170,8 @@ ksort(caddr_t v, int n, int s, int (*f)(void *, void *))
 		return;
 
 	/* Sanity check on arguments */
-	ASSERT3U(((uintptr_t)v & 0x3), ==, 0);
-	ASSERT3S((s & 0x3), ==, 0);
-	ASSERT3S(s, >, 0);
+	ASSERT(((uintptr_t)v & 0x3) == 0 && (s & 0x3) == 0);
+	ASSERT(s > 0);
 	for (g = n / 2; g > 0; g /= 2) {
 		for (i = g; i < n; i++) {
 			for (j = i - g; j >= 0 &&
@@ -737,7 +738,7 @@ out:
 static void
 acevals_init(acevals_t *vals, uid_t key)
 {
-	memset(vals, 0, sizeof (*vals));
+	bzero(vals, sizeof (*vals));
 	vals->allowed = ACE_MASK_UNDEFINED;
 	vals->denied = ACE_MASK_UNDEFINED;
 	vals->mask = ACE_MASK_UNDEFINED;
@@ -1654,13 +1655,13 @@ acl_trivial_create(mode_t mode, boolean_t isdir, ace_t **acl, int *count)
  */
 int
 ace_trivial_common(void *acep, int aclcnt,
-    uintptr_t (*walk)(void *, uintptr_t, int aclcnt,
+    uint64_t (*walk)(void *, uint64_t, int aclcnt,
     uint16_t *, uint16_t *, uint32_t *))
 {
 	uint16_t flags;
 	uint32_t mask;
 	uint16_t type;
-	uintptr_t cookie = 0;
+	uint64_t cookie = 0;
 
 	while ((cookie = walk(acep, cookie, aclcnt, &flags, &type, &mask))) {
 		switch (flags & ACE_TYPE_FLAGS) {

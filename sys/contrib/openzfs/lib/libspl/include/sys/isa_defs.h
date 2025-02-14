@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -126,7 +126,7 @@ extern "C" {
 #endif
 
 /* arm arch specific defines */
-#elif defined(__arm) || defined(__arm__)
+#elif defined(__arm) || defined(__arm__) || defined(__aarch64__)
 
 #if !defined(__arm)
 #define	__arm
@@ -136,11 +136,17 @@ extern "C" {
 #define	__arm__
 #endif
 
+#if defined(__aarch64__)
+#if !defined(_LP64)
+#define	_LP64
+#endif
+#else
 #if !defined(_ILP32)
 #define	_ILP32
 #endif
+#endif
 
-#if defined(__ARMEL__)
+#if defined(__ARMEL__) || defined(__AARCH64EL__)
 #define	_ZFS_LITTLE_ENDIAN
 #else
 #define	_ZFS_BIG_ENDIAN
@@ -151,21 +157,6 @@ extern "C" {
 #if defined(__ARM_FEATURE_UNALIGNED)
 #define	HAVE_EFFICIENT_UNALIGNED_ACCESS
 #endif
-
-/* aarch64 arch specific defines */
-#elif defined(__aarch64__)
-
-#if !defined(_LP64)
-#define	_LP64
-#endif
-
-#if defined(__AARCH64EL__)
-#define	_ZFS_LITTLE_ENDIAN
-#else
-#define	_ZFS_BIG_ENDIAN
-#endif
-
-#define	_SUNOS_VTOC_16
 
 /* sparc arch specific defines */
 #elif defined(__sparc) || defined(__sparc__)
@@ -227,12 +218,8 @@ extern "C" {
  * RISC-V arch specific defines
  * only RV64G (including atomic) LP64 is supported yet
  */
-#elif defined(__riscv) && defined(__riscv_xlen) && __riscv_xlen == 64 && \
+#elif defined(__riscv) && defined(_LP64) && _LP64 && \
 	defined(__riscv_atomic) && __riscv_atomic
-
-#if !defined(_LP64)
-#define	_LP64 1
-#endif
 
 #ifndef	__riscv__
 #define	__riscv__
@@ -246,26 +233,10 @@ extern "C" {
 
 #define	_SUNOS_VTOC_16
 
-/*
- * LoongArch arch specific defines
- * only LoongArch64 is supported yet
- */
-#elif defined(__loongarch__) && defined(__loongarch_lp64)
-
-#if !defined(_LP64)
-#define	_LP64
-#endif
-
-#define	_ZFS_LITTLE_ENDIAN
-#define	_SUNOS_VTOC_16
-
-/* not all LoongArch cores support unaligned accesses in hardware */
-#define	_ALIGNMENT_REQUIRED	1
-
 #else
 /*
  * Currently supported:
- * x86_64, x32, i386, arm, powerpc, s390, sparc, mips, RV64G, and LoongArch64
+ * x86_64, x32, i386, arm, powerpc, s390, sparc, mips, and RV64G
  */
 #error "Unsupported ISA type"
 #endif

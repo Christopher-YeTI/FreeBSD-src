@@ -24,6 +24,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/byteorder.h>
@@ -109,7 +112,7 @@ zfs_kmem_free(void *buf, size_t size __unused)
 		if (i == buf)
 			break;
 	}
-	ASSERT3P(i, !=, NULL);
+	ASSERT(i != NULL);
 	LIST_REMOVE(i, next);
 	mtx_unlock(&kmem_items_mtx);
 	memset(buf, 0xDC, MAX(size, 16));
@@ -153,13 +156,13 @@ kmem_std_destructor(void *mem, int size __unused, void *private)
 }
 
 kmem_cache_t *
-kmem_cache_create(const char *name, size_t bufsize, size_t align,
+kmem_cache_create(char *name, size_t bufsize, size_t align,
     int (*constructor)(void *, void *, int), void (*destructor)(void *, void *),
     void (*reclaim)(void *) __unused, void *private, vmem_t *vmp, int cflags)
 {
 	kmem_cache_t *cache;
 
-	ASSERT3P(vmp, ==, NULL);
+	ASSERT(vmp == NULL);
 
 	cache = kmem_alloc(sizeof (*cache), KM_SLEEP);
 	strlcpy(cache->kc_name, name, sizeof (cache->kc_name));
@@ -240,14 +243,22 @@ void
 kmem_cache_reap_soon(kmem_cache_t *cache)
 {
 #ifndef KMEM_DEBUG
+#if __FreeBSD_version >= 1300043
 	uma_zone_reclaim(cache->kc_zone, UMA_RECLAIM_DRAIN);
+#else
+	zone_drain(cache->kc_zone);
+#endif
 #endif
 }
 
 void
 kmem_reap(void)
 {
+#if __FreeBSD_version >= 1300043
 	uma_reclaim(UMA_RECLAIM_TRIM);
+#else
+	uma_reclaim();
+#endif
 }
 #else
 void
@@ -313,7 +324,7 @@ void
 spl_kmem_cache_set_move(kmem_cache_t *skc,
     kmem_cbrc_t (move)(void *, void *, size_t, void *))
 {
-	ASSERT3P(move, !=, NULL);
+	ASSERT(move != NULL);
 }
 
 #ifdef KMEM_DEBUG

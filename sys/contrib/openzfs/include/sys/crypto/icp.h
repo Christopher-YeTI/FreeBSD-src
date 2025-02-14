@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -29,8 +29,17 @@
 int aes_mod_init(void);
 int aes_mod_fini(void);
 
+int edonr_mod_init(void);
+int edonr_mod_fini(void);
+
+int sha1_mod_init(void);
+int sha1_mod_fini(void);
+
 int sha2_mod_init(void);
 int sha2_mod_fini(void);
+
+int skein_mod_init(void);
+int skein_mod_fini(void);
 
 int icp_init(void);
 void icp_fini(void);

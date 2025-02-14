@@ -30,18 +30,18 @@
 function cleanup
 {
 	datasetexists $TESTPOOL/$TESTFS1 && \
-	    destroy_dataset $TESTPOOL/$TESTFS1 -R
+	    log_must zfs destroy -R $TESTPOOL/$TESTFS1
 	datasetexists $TESTPOOL/$TESTVOL && \
-	    destroy_dataset $TESTPOOL/$TESTVOL -Rf
+	    log_must zfs destroy -Rf $TESTPOOL/$TESTVOL
 }
 
 function setup_snapshots
 {
 	for i in $snaps; do
 		datasetexists $TESTPOOL/$TESTFS1@snap$i && \
-		    destroy_dataset $TESTPOOL/$TESTFS1@snap$i
+		    log_must zfs destroy $TESTPOOL/$TESTFS1@snap$i
 		datasetexists $TESTPOOL/$TESTVOL@snap$i && \
-		    destroy_dataset $TESTPOOL/$TESTVOL@snap$i
+		    log_must zfs destroy $TESTPOOL/$TESTVOL@snap$i
 		log_must zfs snapshot $TESTPOOL/$TESTFS1@snap$i
 		log_must zfs snapshot $TESTPOOL/$TESTVOL@snap$i
 	done

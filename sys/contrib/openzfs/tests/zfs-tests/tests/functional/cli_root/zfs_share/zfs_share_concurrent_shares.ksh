@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,20 +47,31 @@ verify_runnable "global"
 function cleanup
 {
 	wait
-	for fs in {0..50}
+	for fs in $(seq 0 50)
 	do
-		for pfs in $TESTFS1 $TESTFS2 $TESTFS3
-		do
-			log_must zfs set sharenfs=off $TESTPOOL/$pfs/$fs
-			unshare_fs $TESTPOOL/$pfs/$fs
+		log_must zfs set sharenfs=off $TESTPOOL/$TESTFS1/$fs
+		log_must zfs set sharenfs=off $TESTPOOL/$TESTFS2/$fs
+		log_must zfs set sharenfs=off $TESTPOOL/$TESTFS3/$fs
+		unshare_fs $TESTPOOL/$TESTFS1/$fs
+		unshare_fs $TESTPOOL/$TESTFS2/$fs
+		unshare_fs $TESTPOOL/$TESTFS3/$fs
 
-			if mounted $TESTPOOL/$pfs/$fs; then
-				log_must zfs unmount $TESTPOOL/$pfs/$fs
-			fi
+		if mounted $TESTPOOL/$TESTFS1/$fs; then
+			log_must zfs unmount $TESTPOOL/$TESTFS1/$fs
+		fi
+		if mounted $TESTPOOL/$TESTFS2/$fs; then
+			log_must zfs unmount $TESTPOOL/$TESTFS2/$fs
+		fi
+		if mounted $TESTPOOL/$TESTFS3/$fs; then
+			log_must zfs unmount $TESTPOOL/$TESTFS3/$fs
+		fi
 
-			datasetexists $TESTPOOL/$pfs/$fs && \
-				destroy_dataset $TESTPOOL/$pfs/$fs -f
-		done
+		datasetexists $TESTPOOL/$TESTFS1/$fs && \
+			log_must zfs destroy -f $TESTPOOL/$TESTFS1/$fs
+		datasetexists $TESTPOOL/$TESTFS2/$fs && \
+			log_must zfs destroy -f $TESTPOOL/$TESTFS2/$fs
+		datasetexists $TESTPOOL/$TESTFS3/$fs && \
+			log_must zfs destroy -f $TESTPOOL/$TESTFS3/$fs
 	done
 
 	log_must zfs share -a
@@ -68,18 +79,12 @@ function cleanup
 
 function create_filesystems
 {
-	for fs in {0..50}
+	for fs in $(seq 0 50)
 	do
 		log_must zfs create -p $TESTPOOL/$TESTFS1/$fs
 		log_must zfs create -p $TESTPOOL/$TESTFS2/$fs
 		log_must zfs create -p $TESTPOOL/$TESTFS3/$fs
 	done
-}
-
-function sub_fail
-{
-	log_note $$: "$@"
-	exit 1
 }
 
 #
@@ -94,72 +99,30 @@ function test_share # filesystem
 	typeset mntp=$(get_prop mountpoint $filesystem)
 
 	not_shared $mntp || \
-	    sub_fail "File system $filesystem is already shared."
+	    log_fail "File system $filesystem is already shared."
 
 	zfs set sharenfs=on $filesystem || \
-	    sub_fail "zfs set sharenfs=on $filesystem failed."
+		log_fail "zfs set sharenfs=on $filesystem failed."
+	is_shared $mntp || \
+	    log_fail "File system $filesystem is not shared (set sharenfs)."
 
 	#
-	# Verify 'zfs share' results in a shared mount.  We check this
-	# multiple times because of Fedora 37+ it's been observed in
-	# the CI that the share may not be immediately reported.
-	#
-	for retry in $(seq 1 10); do
-		is_shared $mntp && break
-
-		log_note "Wait $retry / 10 for is_shared $mntp (set sharenfs)"
-
-		if [[ $retry -eq 10 ]]; then
-			sub_fail "File system $filesystem is not shared (set sharenfs)."
-		fi
-
-		sleep 1
-	done
-
-	#
-	# Verify 'zfs unshare' works as well.
+	# Verify 'zfs share' works as well.
 	#
 	zfs unshare $filesystem || \
-	    sub_fail "zfs unshare $filesystem failed."
+		log_fail "zfs unshare $filesystem failed."
 	is_shared $mntp && \
-	    sub_fail "File system $filesystem is still shared."
-
+	    log_fail "File system $filesystem is still shared."
 
 	zfs share $filesystem || \
-	    sub_fail "zfs share $filesystem failed."
-
-	#
-	# Verify 'zfs share' results in a shared mount.  We check this
-	# multiple times because of Fedora 37+ it's been observed in
-	# the CI that the share may not be immediately reported.
-	#
-	for retry in $(seq 1 10); do
-		is_shared $mntp && break
-
-		log_note "Wait $retry / 10 for is_shared $mntp (zfs share)"
-
-		if [[ $retry -eq 10 ]]; then
-			sub_fail "File system $filesystem is not shared (zfs share)."
-		fi
-
-		sleep 1
-	done
+		log_fail "zfs share $filesystem failed."
+	is_shared $mntp || \
+	    log_fail "file system $filesystem is not shared (zfs share)."
 
 	#log_note "Sharing a shared file system fails."
 	zfs share $filesystem && \
-	    sub_fail "zfs share $filesystem did not fail"
-
+		log_fail "zfs share $filesystem did not fail"
 	return 0
-}
-
-function unshare_fs_nolog
-{
-	typeset fs=$1
-
-	if is_shared $fs || is_shared_smb $fs; then
-		zfs unshare $fs ||
-		    sub_fail "zfs unshare $fs: $?"
-	fi
 }
 
 #
@@ -174,16 +137,20 @@ log_onexit cleanup
 create_filesystems
 
 child_pids=()
-for fs in {0..50}
+for fs in $(seq 0 50)
 do
-	for pfs in $TESTFS1 $TESTFS2 $TESTFS3
-	do
-		test_share $TESTPOOL/$pfs/$fs &
-		child_pids+=($!)
-		log_note "$TESTPOOL/$pfs/$fs ==> $!"
-	done
+	test_share $TESTPOOL/$TESTFS1/$fs &
+	child_pids+=($!)
+	log_note "$TESTPOOL/$TESTFS1/$fs ==> $!"
+	test_share $TESTPOOL/$TESTFS2/$fs &
+	child_pids+=($!)
+	log_note "$TESTPOOL/$TESTFS2/$fs ==> $!"
+	test_share $TESTPOOL/$TESTFS3/$fs &
+	child_pids+=($!)
+	log_note "$TESTPOOL/$TESTFS3/$fs ==> $!"
 done
-log_must wait_for_children "${child_pids[@]}"
+wait_for_children "${child_pids[@]}" ||
+	log_fail "multithreaded share test failed"
 
 log_note "Verify 'zfs share -a' succeeds."
 
@@ -191,16 +158,17 @@ log_note "Verify 'zfs share -a' succeeds."
 # Unshare each of the file systems.
 #
 child_pids=()
-for fs in {0..50}
+for fs in $(seq 0 50)
 do
-	for pfs in $TESTFS1 $TESTFS2 $TESTFS3
-	do
-		unshare_fs_nolog $TESTPOOL/$pfs/$fs &
-		child_pids+=($!)
-		log_note "$TESTPOOL/$pfs/$fs (unshare) ==> $!"
-	done
+	unshare_fs $TESTPOOL/$TESTFS1/$fs &
+	child_pids+=($!)
+	unshare_fs $TESTPOOL/$TESTFS2/$fs &
+	child_pids+=($!)
+	unshare_fs $TESTPOOL/$TESTFS3/$fs &
+	child_pids+=($!)
 done
-log_must wait_for_children "${child_pids[@]}"
+wait_for_children "${child_pids[@]}" ||
+	log_fail "multithreaded unshare failed"
 
 #
 # Try a zfs share -a and verify all file systems are shared.
@@ -213,13 +181,21 @@ log_must zfs share -a
 #
 unset __ZFS_POOL_EXCLUDE
 
-for fs in {0..50}
+for fs in $(seq 0 50)
 do
-	for pfs in $TESTFS1 $TESTFS2 $TESTFS3
-	do
-		log_must is_shared $TESTPOOL/$pfs/$fs
-		log_must is_exported $TESTPOOL/$pfs/$fs
-	done
+	is_shared $TESTPOOL/$TESTFS1/$fs || \
+	    log_fail "File system $TESTPOOL/$TESTFS1/$fs is not shared"
+	is_shared $TESTPOOL/$TESTFS2/$fs || \
+	    log_fail "File system $TESTPOOL/$TESTFS2/$fs is not shared"
+	is_shared $TESTPOOL/$TESTFS3/$fs || \
+	    log_fail "File system $TESTPOOL/$TESTFS3/$fs is not shared"
+
+	is_exported $TESTPOOL/$TESTFS1/$fs || \
+	    log_fail "File system $TESTPOOL/$TESTFS1/$fs is not exported"
+	is_exported $TESTPOOL/$TESTFS2/$fs || \
+	    log_fail "File system $TESTPOOL/$TESTFS2/$fs is not exported"
+	is_exported $TESTPOOL/$TESTFS3/$fs || \
+	    log_fail "File system $TESTPOOL/$TESTFS3/$fs is not exported"
 done
 
-log_pass "'zfs share [-a] <filesystem>' succeeds as root."
+log_pass "'zfs share [ -a ] <filesystem>' succeeds as root."

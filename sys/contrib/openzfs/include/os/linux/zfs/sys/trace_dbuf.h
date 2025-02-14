@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -45,13 +45,9 @@
  *     dmu_buf_impl_t *, ...,
  *     zio_t *, ...);
  */
-#define	DBUF_TP_STRUCT_ENTRY_OS_SPA \
-	    (db != NULL && \
-		POINTER_IS_VALID(DB_DNODE(db)->dn_objset)) \
-	    ? spa_name(DB_DNODE(db)->dn_objset->os_spa) : "NULL"
 
 #define	DBUF_TP_STRUCT_ENTRY					\
-	__string(os_spa, DBUF_TP_STRUCT_ENTRY_OS_SPA)		\
+	__dynamic_array(char,	os_spa,	TRACE_DBUF_MSG_MAX)	\
 	__field(uint64_t,	ds_object)			\
 	__field(uint64_t,	db_object)			\
 	__field(uint64_t,	db_level)			\
@@ -59,11 +55,14 @@
 	__field(uint64_t,	db_offset)			\
 	__field(uint64_t,	db_size)			\
 	__field(uint64_t,	db_state)			\
-	__field(int64_t,	db_holds)
+	__field(int64_t,	db_holds)			\
+	__dynamic_array(char,	msg,	TRACE_DBUF_MSG_MAX)
 
 #define	DBUF_TP_FAST_ASSIGN						\
 	if (db != NULL) {						\
-		__assign_str_impl(os_spa, DBUF_TP_STRUCT_ENTRY_OS_SPA); \
+		__assign_str(os_spa,					\
+		spa_name(DB_DNODE(db)->dn_objset->os_spa));		\
+									\
 		__entry->ds_object = db->db_objset->os_dsl_dataset ?	\
 		db->db_objset->os_dsl_dataset->ds_object : 0;		\
 									\
@@ -74,8 +73,10 @@
 		__entry->db_size   = db->db.db_size;			\
 		__entry->db_state  = db->db_state;			\
 		__entry->db_holds  = zfs_refcount_count(&db->db_holds);	\
+		snprintf(__get_str(msg), TRACE_DBUF_MSG_MAX,		\
+		    DBUF_TP_PRINTK_FMT, DBUF_TP_PRINTK_ARGS);		\
 	} else {							\
-		__assign_str_impl(os_spa, DBUF_TP_STRUCT_ENTRY_OS_SPA); \
+		__assign_str(os_spa, "NULL")				\
 		__entry->ds_object = 0;					\
 		__entry->db_object = 0;					\
 		__entry->db_level  = 0;					\
@@ -84,6 +85,8 @@
 		__entry->db_size   = 0;					\
 		__entry->db_state  = 0;					\
 		__entry->db_holds  = 0;					\
+		snprintf(__get_str(msg), TRACE_DBUF_MSG_MAX,		\
+		    "dbuf { NULL }");					\
 	}
 
 #define	DBUF_TP_PRINTK_FMT						\
@@ -102,7 +105,7 @@ DECLARE_EVENT_CLASS(zfs_dbuf_class,
 	TP_ARGS(db, zio),
 	TP_STRUCT__entry(DBUF_TP_STRUCT_ENTRY),
 	TP_fast_assign(DBUF_TP_FAST_ASSIGN),
-	TP_printk(DBUF_TP_PRINTK_FMT, DBUF_TP_PRINTK_ARGS)
+	TP_printk("%s", __get_str(msg))
 );
 
 DECLARE_EVENT_CLASS(zfs_dbuf_state_class,
@@ -110,20 +113,24 @@ DECLARE_EVENT_CLASS(zfs_dbuf_state_class,
 	TP_ARGS(db, why),
 	TP_STRUCT__entry(DBUF_TP_STRUCT_ENTRY),
 	TP_fast_assign(DBUF_TP_FAST_ASSIGN),
-	TP_printk(DBUF_TP_PRINTK_FMT, DBUF_TP_PRINTK_ARGS)
+	TP_printk("%s", __get_str(msg))
 );
 /* END CSTYLED */
 
+/* BEGIN CSTYLED */
 #define	DEFINE_DBUF_EVENT(name) \
 DEFINE_EVENT(zfs_dbuf_class, name, \
-    TP_PROTO(dmu_buf_impl_t *db, zio_t *zio), \
-    TP_ARGS(db, zio))
+	TP_PROTO(dmu_buf_impl_t *db, zio_t *zio), \
+	TP_ARGS(db, zio))
+/* END CSTYLED */
 DEFINE_DBUF_EVENT(zfs_blocked__read);
 
+/* BEGIN CSTYLED */
 #define	DEFINE_DBUF_STATE_EVENT(name) \
 DEFINE_EVENT(zfs_dbuf_state_class, name, \
-    TP_PROTO(dmu_buf_impl_t *db, const char *why), \
-    TP_ARGS(db, why))
+	TP_PROTO(dmu_buf_impl_t *db, const char *why), \
+	TP_ARGS(db, why))
+/* END CSTYLED */
 DEFINE_DBUF_STATE_EVENT(zfs_dbuf__state_change);
 
 /* BEGIN CSTYLED */
@@ -132,14 +139,16 @@ DECLARE_EVENT_CLASS(zfs_dbuf_evict_one_class,
 	TP_ARGS(db, mls),
 	TP_STRUCT__entry(DBUF_TP_STRUCT_ENTRY),
 	TP_fast_assign(DBUF_TP_FAST_ASSIGN),
-	TP_printk(DBUF_TP_PRINTK_FMT, DBUF_TP_PRINTK_ARGS)
+	TP_printk("%s", __get_str(msg))
 );
 /* END CSTYLED */
 
+/* BEGIN CSTYLED */
 #define	DEFINE_DBUF_EVICT_ONE_EVENT(name) \
 DEFINE_EVENT(zfs_dbuf_evict_one_class, name, \
-    TP_PROTO(dmu_buf_impl_t *db, multilist_sublist_t *mls), \
-    TP_ARGS(db, mls))
+	TP_PROTO(dmu_buf_impl_t *db, multilist_sublist_t *mls), \
+	TP_ARGS(db, mls))
+/* END CSTYLED */
 DEFINE_DBUF_EVICT_ONE_EVENT(zfs_dbuf__evict__one);
 
 #endif /* _TRACE_DBUF_H */

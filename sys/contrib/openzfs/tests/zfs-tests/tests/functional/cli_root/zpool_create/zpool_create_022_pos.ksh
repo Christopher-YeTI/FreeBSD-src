@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -49,13 +49,12 @@ verify_runnable "global"
 function cleanup
 {
 	poolexists $TESTPOOL && destroy_pool $TESTPOOL
-	log_must rm -df "/tmp/mnt$$"
 }
 
 log_onexit cleanup
 
-log_assert "'zpool create -O property=value pool' can successfully create a pool" \
-		"with multiple filesystem properties set."
+log_assert "'zpool create -O property=value pool' can successfully create a pool \
+		with multiple filesystem properties set."
 
 set -A RW_FS_PROP "quota=536870912" \
 		  "reservation=536870912" \
@@ -82,13 +81,15 @@ while (( $i < ${#RW_FS_PROP[*]} )); do
 done
 
 log_must zpool create $opts -f $TESTPOOL $DISKS
-log_must datasetexists $TESTPOOL
+datasetexists $TESTPOOL || log_fail "zpool create $TESTPOOL fail."
 
 i=0
 while (( $i < ${#RW_FS_PROP[*]} )); do
-	log_must propertycheck $TESTPOOL ${RW_FS_PROP[i]}
+	propertycheck $TESTPOOL ${RW_FS_PROP[i]} || \
+			log_fail "${RW_FS_PROP[i]} is failed to set."
 	(( i = i + 1 ))
 done
 
-log_pass "'zpool create -O property=value pool' can successfully create a pool" \
-		"with multiple filesystem properties set."
+log_pass "'zpool create -O property=value pool' can successfully create a pool \
+		with multiple filesystem properties set."
+

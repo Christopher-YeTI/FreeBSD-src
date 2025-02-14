@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -50,7 +50,7 @@ function cleanup
 function sync_n
 {
 	for i in {1..$1}; do
-		sync_pool $TESTPOOL
+		log_must zpool sync $TESTPOOL
 	done
 	return 0
 }
@@ -74,9 +74,9 @@ function do_test
 	# finish reading.
 	#
 	{
-		log_must eval "dd bs=512 count=4 >/dev/null"
+		log_must dd bs=512 count=4 >/dev/null
 		log_must eval "$cmd"
-		log_must eval 'cat 2>&1 >/dev/null | grep "Input/output error"'
+		cat 2>&1 >/dev/null | log_must grep "Input/output error"
 	} <$TXG_HIST
 }
 

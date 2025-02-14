@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lstate.c,v 2.99.1.2 2013/11/08 17:45:31 roberto Exp $
 ** Global State
@@ -316,3 +317,4 @@ LUA_API void lua_close (lua_State *L) {
   lua_lock(L);
   close_state(L);
 }
+/* END CSTYLED */

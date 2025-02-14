@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,20 +48,19 @@ verify_runnable "both"
 
 function cleanup
 {
-	[ -e $TESTDIR1 ] && log_must rm -rf $TESTDIR1/*
+	[[ -e $TESTDIR1 ]] && \
+		log_must rm -rf $TESTDIR1/* > /dev/null 2>&1
 
-	snapexists $SNAPCTR && destroy_dataset $SNAPCTR
+	snapexists $SNAPCTR && \
+		log_must zfs destroy $SNAPCTR
 
 	datasetexists $TESTPOOL/$TESTCTR/$TESTFS1 && \
 		log_must zfs set quota=none $TESTPOOL/$TESTCTR/$TESTFS1
 
-	zfs inherit compression $TESTPOOL
 }
 
 log_assert "Verify creating/destroying snapshots do things clean"
 log_onexit cleanup
-
-log_must zfs set compression=off $TESTPOOL
 
 log_must zfs set quota=$FSQUOTA $TESTPOOL/$TESTCTR/$TESTFS1
 log_must mkfile $FILESIZE $TESTDIR1/$TESTFILE

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -62,14 +62,17 @@ function cleanup
 	[[ -d $TESTDIR2 ]] && \
 		log_must rm -rf $TESTDIR2
 
-	datasetexists "$TESTPOOL/$TESTCLONE" && \
-		destroy_dataset $TESTPOOL/$TESTCLONE -f
+	if datasetexists "$TESTPOOL/$TESTCLONE"; then
+		log_must zfs destroy -f $TESTPOOL/$TESTCLONE
+	fi
 
-	snapexists "$TESTPOOL/$TESTFS2@snapshot" && \
-		destroy_dataset $TESTPOOL/$TESTFS2@snapshot -f
+	if snapexists "$TESTPOOL/$TESTFS2@snapshot"; then
+		log_must zfs destroy -f $TESTPOOL/$TESTFS2@snapshot
+	fi
 
-	datasetexists "$TESTPOOL/$TESTFS2" && \
-		destroy_dataset $TESTPOOL/$TESTFS2 -f
+	if datasetexists "$TESTPOOL/$TESTFS2"; then
+		log_must zfs destroy -f $TESTPOOL/$TESTFS2
+	fi
 }
 
 #
@@ -149,7 +152,7 @@ while (( i < ${#mntp_fs[*]} )); do
 	else
 		log_must zfs set sharenfs=on ${mntp_fs[((i+1))]}
 		is_shared ${mntp_fs[i]} || \
-			log_fail "'zfs set sharenfs=on' fails to share filesystem: ${mntp_fs[i]} not shared."
+			log_fail "'zfs set sharenfs=on' fails to share filesystem."
 	fi
 
         ((i = i + 2))
@@ -166,7 +169,7 @@ log_must zfs unshare -a
 i=0
 while (( i < ${#mntp_fs[*]} )); do
         not_shared ${mntp_fs[i]} || \
-                log_fail "'zfs unshare -a' fails to unshare all shared zfs filesystems: ${mntp_fs[i]} still shared."
+                log_fail "'zfs unshare -a' fails to unshare all shared zfs filesystems."
 
         ((i = i + 2))
 done

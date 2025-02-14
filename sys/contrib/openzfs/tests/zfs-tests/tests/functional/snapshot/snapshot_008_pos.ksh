@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,20 +48,23 @@ function cleanup
 {
 	typeset -i i=1
 	while [[ $i -lt $COUNT ]]; do
-		snapexists $SNAPFS.$i &&
+		snapexists $SNAPFS.$i
+		[[ $? -eq 0 ]] && \
 			log_must zfs destroy $SNAPFS.$i
 
 		(( i = i + 1 ))
 	done
 
-	[ -e $TESTDIR ] && log_must rm -rf $TESTDIR/*
+	[[ -e $TESTDIR ]] && \
+		log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 }
 
 log_assert "Verify that destroying snapshots returns space to the pool."
 
 log_onexit cleanup
 
-[ -n $TESTDIR ] && log_must rm -rf $TESTDIR/*
+[[ -n $TESTDIR ]] && \
+    log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 
 typeset -i COUNT=10
 
@@ -79,7 +82,7 @@ done
 
 typeset -i i=1
 while [[ $i -lt $COUNT ]]; do
-	log_must rm -f $TESTDIR/file$i
+	log_must rm -rf $TESTDIR/file$i > /dev/null 2>&1
 	log_must zfs destroy $SNAPFS.$i
 
 	(( i = i + 1 ))

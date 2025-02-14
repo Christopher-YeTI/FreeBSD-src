@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -96,7 +96,6 @@ extern boolean_t vdev_draid_readable(vdev_t *, uint64_t);
 extern boolean_t vdev_draid_missing(vdev_t *, uint64_t, uint64_t, uint64_t);
 extern uint64_t vdev_draid_asize_to_psize(vdev_t *, uint64_t);
 extern void vdev_draid_map_alloc_empty(zio_t *, struct raidz_row *);
-extern int vdev_draid_map_verify_empty(zio_t *, struct raidz_row *);
 extern nvlist_t *vdev_draid_read_config_spare(vdev_t *);
 
 /* Functions for dRAID distributed spares. */

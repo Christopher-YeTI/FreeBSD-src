@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: ldo.h,v 2.20.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Stack and Call structure of Lua
@@ -43,3 +44,4 @@ LUAI_FUNC l_noret luaD_throw (lua_State *L, int errcode);
 LUAI_FUNC int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud);
 
 #endif
+/* END CSTYLED */

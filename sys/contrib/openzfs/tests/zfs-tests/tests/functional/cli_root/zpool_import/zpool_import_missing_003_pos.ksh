@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -97,8 +97,9 @@ function verify
 	[[ ! -e $mtpt/$file ]] && \
 		log_fail "$mtpt/$file missing after import."
 
-	read -r checksum2 _ < <(cksum $mymtpt/$file)
-	log_must [ "$checksum1" = "$checksum2" ]
+	checksum2=$(sum $mymtpt/$file | awk '{print $1}')
+	[[ "$checksum1" != "$checksum2" ]] && \
+		log_fail "Checksums differ ($checksum1 != $checksum2)"
 
 	return 0
 
@@ -106,7 +107,7 @@ function verify
 
 function cleanup
 {
-	log_must cd $DEVICE_DIR
+	cd $DEVICE_DIR || log_fail "Unable change directory to $DEVICE_DIR"
 
 	for pool in $TESTPOOL1 $TESTPOOL2; do
 		if poolexists "$pool" ; then
@@ -135,7 +136,7 @@ function cleanup_all
 	done
 
 	log_must rm -f $DEVICE_DIR/$DEVICE_ARCHIVE
-	log_must cd $CWD
+	cd $CWD || log_fail "Unable change directory to $CWD"
 
 }
 
@@ -145,10 +146,10 @@ log_assert "Verify that import could handle device overlapped."
 
 CWD=$PWD
 
-log_must cd $DEVICE_DIR
+cd $DEVICE_DIR || log_fail "Unable change directory to $DEVICE_DIR"
 log_must tar cf $DEVICE_DIR/$DEVICE_ARCHIVE ${DEVICE_FILE}*
 
-read -r checksum1 < <(cksum $MYTESTFILE)
+checksum1=$(sum $MYTESTFILE | awk '{print $1}')
 
 typeset -i i=0
 typeset -i j=0

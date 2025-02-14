@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: ltm.h,v 2.11.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Tag methods
@@ -55,3 +56,4 @@ LUAI_FUNC const TValue *luaT_gettmbyobj (lua_State *L, const TValue *o,
 LUAI_FUNC void luaT_init (lua_State *L);
 
 #endif
+/* END CSTYLED */

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -31,7 +31,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <sys/file.h>
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
@@ -115,12 +115,12 @@ parse_pathname(const char *inpath, char *dataset, char *relpath,
 		return (-1);
 	}
 
-	(void) strlcpy(dataset, mp.mnt_special, MAXNAMELEN);
+	(void) strcpy(dataset, mp.mnt_special);
 
 	rel = fullpath + strlen(mp.mnt_mountp);
 	if (rel[0] == '/')
 		rel++;
-	(void) strlcpy(relpath, rel, MAXPATHLEN);
+	(void) strcpy(relpath, rel);
 
 	return (0);
 }
@@ -186,7 +186,6 @@ initialize_range(err_type_t type, int level, char *range,
 	switch (type) {
 	default:
 		break;
-
 	case TYPE_DATA:
 		break;
 
@@ -258,7 +257,7 @@ translate_record(err_type_t type, const char *object, const char *range,
 		}
 
 		dataset[0] = '\0';
-		(void) strlcpy(poolname, object, MAXNAMELEN);
+		(void) strcpy(poolname, object);
 		return (0);
 	}
 
@@ -298,7 +297,7 @@ translate_record(err_type_t type, const char *object, const char *range,
 	/*
 	 * Copy the pool name
 	 */
-	(void) strlcpy(poolname, dataset, MAXNAMELEN);
+	(void) strcpy(poolname, dataset);
 	if ((slash = strchr(poolname, '/')) != NULL)
 		*slash = '\0';
 

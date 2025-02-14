@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -35,8 +35,8 @@
 #
 # DESCRIPTION:
 # A zfs file system snapshot is identical to
-# the originally snapshotted file system, after the file
-# system has been changed. Uses 'cksum'.
+# the originally snapshot'd file system, after the file
+# system has been changed. Uses 'sum -r'.
 #
 # STRATEGY:
 # 1. Create a file in the zfs file system
@@ -50,11 +50,18 @@ verify_runnable "both"
 
 function cleanup
 {
-	if snapexists $SNAPFS; then
+	snapexists $SNAPFS
+	if [[ $? -eq 0 ]]; then
 		log_must zfs destroy $SNAPFS
 	fi
 
-	log_must rm -rf $SNAPDIR $TESTDIR/*
+	if [[ -e $SNAPDIR ]]; then
+		log_must rm -rf $SNAPDIR > /dev/null 2>&1
+	fi
+
+	if [[ -e $TESTDIR ]]; then
+		log_must rm -rf $TESTDIR/* > /dev/null 2>&1
+	fi
 }
 
 log_assert "Verify a file system snapshot is identical to original."
@@ -66,7 +73,7 @@ log_must file_write -o create -f $TESTDIR/$TESTFILE -b $BLOCKSZ \
     -c $NUM_WRITES -d $DATA
 
 log_note "Sum the file, save for later comparison..."
-read -r FILE_SUM _ < <(cksum $TESTDIR/$TESTFILE)
+FILE_SUM=`sum -r $TESTDIR/$TESTFILE | awk  '{ print $1 }'`
 log_note "FILE_SUM = $FILE_SUM"
 
 log_note "Create a snapshot and mount it..."
@@ -76,7 +83,7 @@ log_note "Append to the original file..."
 log_must file_write -o append -f $TESTDIR/$TESTFILE -b $BLOCKSZ \
     -c $NUM_WRITES -d $DATA
 
-read -r SNAP_FILE_SUM _ < <(cksum $SNAPDIR/$TESTFILE)
+SNAP_FILE_SUM=`sum -r $SNAPDIR/$TESTFILE | awk '{ print $1 }'`
 if [[ $SNAP_FILE_SUM -ne $FILE_SUM ]]; then
 	log_fail "Sums do not match, aborting!! ($SNAP_FILE_SUM != $FILE_SUM)"
 fi

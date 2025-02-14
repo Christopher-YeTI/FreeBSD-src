@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,14 +48,19 @@ verify_runnable "both"
 
 function cleanup
 {
-	rm -rf $TESTDIR/tar$$.tar $TESTDIR/$BNAME
+	rm -rf $TESTDIR/tar$$.tar
+	rm -rf $TESTDIR/$BNAME
 }
 
 log_assert "Migrating test file from ZFS fs to ZFS fs using tar"
 
 log_onexit cleanup
 
-log_must prepare $DNAME "tar cf $TESTDIR/tar$$.tar $BNAME"
-log_must migrate $TESTDIR $SUMA $SUMB "tar xf $TESTDIR/tar$$.tar"
+prepare $DNAME "tar cf $TESTDIR/tar$$.tar $BNAME"
+(( $? != 0 )) && log_fail "Unable to create src archive"
+
+migrate $TESTDIR $SUMA $SUMB "tar xf $TESTDIR/tar$$.tar"
+(( $? != 0 )) && log_fail "Unable to successfully migrate test file from" \
+    "ZFS fs to ZFS fs"
 
 log_pass "Successfully migrated test file from ZFS fs to ZFS fs".

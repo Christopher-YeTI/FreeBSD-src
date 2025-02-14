@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -50,7 +50,9 @@ verify_runnable "both"
 
 function cleanup
 {
-	datasetexists $rootfs && destroy_dataset $rootfs -Rf
+	if datasetexists $rootfs ; then
+		log_must zfs destroy -Rf $rootfs
+	fi
 	log_must zfs create $rootfs
 
 	for file in $output $oldoutput ; do
@@ -71,8 +73,8 @@ typeset expect_str2="All filesystems are formatted with the current version"
 typeset expect_str3="The following filesystems are out of date, and can be upgraded"
 typeset -i COUNT OLDCOUNT
 
-zfs upgrade | awk '$1 ~ "^[0-9]+$" {print $2}'> $oldoutput
-OLDCOUNT=$(wc -l < $oldoutput)
+zfs upgrade | nawk '$1 ~ "^[0-9]+$" {print $2}'> $oldoutput
+OLDCOUNT=$( wc -l $oldoutput | awk '{print $1}' )
 
 old_datasets=""
 for version in $ZFS_ALL_VERSIONS ; do
@@ -98,9 +100,9 @@ log_must eval 'zfs upgrade > $output 2>&1'
 
 # we also check that the usage message contains at least a description
 # of the current ZFS version.
-log_must grep -q "${expect_str1} $ZFS_VERSION" $output
-zfs upgrade | awk '$1 ~ "^[0-9]+$" {print $2}'> $output
-COUNT=$(wc -l < $output)
+log_must eval 'grep "${expect_str1} $ZFS_VERSION" $output > /dev/null 2>&1'
+zfs upgrade | nawk '$1 ~ "^[0-9]+$" {print $2}'> $output
+COUNT=$( wc -l $output | awk '{print $1}' )
 
 typeset -i i=0
 for fs in ${old_datasets}; do
@@ -114,18 +116,20 @@ if (( i != COUNT - OLDCOUNT )); then
 fi
 
 for fs in $old_datasets ; do
-	datasetexists $fs && destroy_dataset $fs -Rf
+	if datasetexists $fs ; then
+		log_must zfs destroy -Rf $fs
+	fi
 done
 
 log_must eval 'zfs upgrade > $output 2>&1'
-log_must grep -q "${expect_str1} $ZFS_VERSION" $output
+log_must eval 'grep "${expect_str1} $ZFS_VERSION" $output > /dev/null 2>&1'
 if (( OLDCOUNT == 0 )); then
-	log_must grep -q "${expect_str2}" $output
+	log_must eval 'grep "${expect_str2}" $output > /dev/null 2>&1'
 else
-	log_must grep -q "${expect_str3}" $output
+	log_must eval 'grep "${expect_str3}" $output > /dev/null 2>&1'
 fi
-zfs upgrade | awk '$1 ~ "^[0-9]+$" {print $2}'> $output
-COUNT=$(wc -l < $output)
+zfs upgrade | nawk '$1 ~ "^[0-9]+$" {print $2}'> $output
+COUNT=$( wc -l $output | awk '{print $1}' )
 
 if (( COUNT != OLDCOUNT )); then
 	cat $output

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -41,7 +41,9 @@
 
 verify_runnable "global"
 
-[ -d "/var/lib/samba/usershares" ] || log_unsupported "Samba usershares disabled"
+if is_linux; then
+	log_unsupported "some distros come with Samba "user shares" disabled"
+fi
 
 function cleanup
 {
@@ -49,10 +51,9 @@ function cleanup
 	log_must zfs destroy -f $TESTPOOL/$TESTFS/shared1
 	log_must zfs destroy -f $TESTPOOL/$TESTFS/shared2
 	log_must zfs destroy -f $TESTPOOL/$TESTFS/shared3
-	log_must rm -f /var/lib/samba/usershares/testpool_testfs_shared{2,3}
 }
 
-log_assert "Verify 'zfs unshare [nfs|smb] -a' only works on the specified" \
+log_assert "Verify 'zfs unshare [nfs|smb] -a' only works on the specified "\
 	"protocol."
 log_onexit cleanup
 
@@ -73,19 +74,19 @@ log_must zfs share -a
 log_must zfs unshare nfs -a
 
 # 3. Verify that only nfs filesystems are unshared.
-log_must not_shared $TESTPOOL/$TESTFS/shared1
-log_must not_shared $TESTPOOL/$TESTFS/shared2
-log_must is_shared_smb $TESTPOOL/$TESTFS/shared2
-log_must is_shared_smb $TESTPOOL/$TESTFS/shared3
+log_must eval "not_shared $TESTPOOL/$TESTFS/shared1"
+log_must eval "not_shared $TESTPOOL/$TESTFS/shared2"
+log_must eval "is_shared_smb $TESTPOOL/$TESTFS/shared2"
+log_must eval "is_shared_smb $TESTPOOL/$TESTFS/shared3"
 
 # 4. Share all filesystems again.
 log_must zfs share -a
 
 # 5. Invoke 'zfs unshare smb -a' and verify only smb filesystems are unshared.
 log_must zfs unshare smb -a
-log_must is_shared $TESTPOOL/$TESTFS/shared1
-log_must is_shared $TESTPOOL/$TESTFS/shared2
-log_must not_shared_smb $TESTPOOL/$TESTFS/shared2
-log_must not_shared_smb $TESTPOOL/$TESTFS/shared3
+log_must eval "is_shared $TESTPOOL/$TESTFS/shared1"
+log_must eval "is_shared $TESTPOOL/$TESTFS/shared2"
+log_must eval "not_shared_smb $TESTPOOL/$TESTFS/shared2"
+log_must eval "not_shared_smb $TESTPOOL/$TESTFS/shared3"
 
 log_pass "'zfs unshare [nfs|smb] -a' only works on the specified protocol."

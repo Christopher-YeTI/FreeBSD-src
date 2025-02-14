@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -61,7 +61,7 @@ priv_policy_ns(const cred_t *cr, int capability, int err,
 static int
 priv_policy(const cred_t *cr, int capability, int err)
 {
-	return (priv_policy_ns(cr, capability, err, cr->user_ns));
+	return (priv_policy_ns(cr, capability, err, NULL));
 }
 
 static int
@@ -121,10 +121,10 @@ secpolicy_vnode_access2(const cred_t *cr, struct inode *ip, uid_t owner,
 int
 secpolicy_vnode_any_access(const cred_t *cr, struct inode *ip, uid_t owner)
 {
-	if (crgetuid(cr) == owner)
+	if (crgetfsuid(cr) == owner)
 		return (0);
 
-	if (zpl_inode_owner_or_capable(zfs_init_idmap, ip))
+	if (zpl_inode_owner_or_capable(kcred->user_ns, ip))
 		return (0);
 
 #if defined(CONFIG_USER_NS)
@@ -147,7 +147,7 @@ secpolicy_vnode_any_access(const cred_t *cr, struct inode *ip, uid_t owner)
 int
 secpolicy_vnode_chown(const cred_t *cr, uid_t owner)
 {
-	if (crgetuid(cr) == owner)
+	if (crgetfsuid(cr) == owner)
 		return (0);
 
 #if defined(CONFIG_USER_NS)
@@ -184,7 +184,7 @@ secpolicy_vnode_remove(const cred_t *cr)
 int
 secpolicy_vnode_setdac(const cred_t *cr, uid_t owner)
 {
-	if (crgetuid(cr) == owner)
+	if (crgetfsuid(cr) == owner)
 		return (0);
 
 #if defined(CONFIG_USER_NS)
@@ -214,15 +214,13 @@ secpolicy_vnode_setid_retain(struct znode *zp __maybe_unused, const cred_t *cr,
  * Determine that subject can set the file setgid flag.
  */
 int
-secpolicy_vnode_setids_setgids(const cred_t *cr, gid_t gid, zidmap_t *mnt_ns,
-    struct user_namespace *fs_ns)
+secpolicy_vnode_setids_setgids(const cred_t *cr, gid_t gid)
 {
-	gid = zfs_gid_to_vfsgid(mnt_ns, fs_ns, gid);
 #if defined(CONFIG_USER_NS)
 	if (!kgid_has_mapping(cr->user_ns, SGID_TO_KGID(gid)))
 		return (EPERM);
 #endif
-	if (crgetgid(cr) != gid && !groupmember(gid, cr))
+	if (crgetfsgid(cr) != gid && !groupmember(gid, cr))
 		return (priv_policy_user(cr, CAP_FSETID, EPERM));
 
 	return (0);
@@ -252,13 +250,22 @@ secpolicy_zfs(const cred_t *cr)
  * Equivalent to secpolicy_zfs(), but works even if the cred_t is not that of
  * the current process.  Takes both cred_t and proc_t so that this can work
  * easily on all platforms.
+ *
+ * The has_capability() function was first exported in the 4.10 Linux kernel
+ * then backported to some LTS kernels.  Prior to this change there was no
+ * mechanism to perform this check therefore EACCES is returned when the
+ * functionality is not present in the kernel.
  */
 int
 secpolicy_zfs_proc(const cred_t *cr, proc_t *proc)
 {
+#if defined(HAVE_HAS_CAPABILITY)
 	if (!has_capability(proc, CAP_SYS_ADMIN))
 		return (EACCES);
 	return (0);
+#else
+	return (EACCES);
+#endif
 }
 
 void
@@ -277,12 +284,9 @@ secpolicy_setid_clear(vattr_t *vap, cred_t *cr)
  * Determine that subject can set the file setid flags.
  */
 static int
-secpolicy_vnode_setid_modify(const cred_t *cr, uid_t owner, zidmap_t *mnt_ns,
-    struct user_namespace *fs_ns)
+secpolicy_vnode_setid_modify(const cred_t *cr, uid_t owner)
 {
-	owner = zfs_uid_to_vfsuid(mnt_ns, fs_ns, owner);
-
-	if (crgetuid(cr) == owner)
+	if (crgetfsuid(cr) == owner)
 		return (0);
 
 #if defined(CONFIG_USER_NS)
@@ -306,14 +310,13 @@ secpolicy_vnode_stky_modify(const cred_t *cr)
 
 int
 secpolicy_setid_setsticky_clear(struct inode *ip, vattr_t *vap,
-    const vattr_t *ovap, cred_t *cr, zidmap_t *mnt_ns,
-    struct user_namespace *fs_ns)
+    const vattr_t *ovap, cred_t *cr)
 {
 	int error;
 
 	if ((vap->va_mode & S_ISUID) != 0 &&
 	    (error = secpolicy_vnode_setid_modify(cr,
-	    ovap->va_uid, mnt_ns, fs_ns)) != 0) {
+	    ovap->va_uid)) != 0) {
 		return (error);
 	}
 
@@ -331,8 +334,7 @@ secpolicy_setid_setsticky_clear(struct inode *ip, vattr_t *vap,
 	 * group-id bit.
 	 */
 	if ((vap->va_mode & S_ISGID) != 0 &&
-	    secpolicy_vnode_setids_setgids(cr, ovap->va_gid,
-	    mnt_ns, fs_ns) != 0) {
+	    secpolicy_vnode_setids_setgids(cr, ovap->va_gid) != 0) {
 		vap->va_mode &= ~S_ISGID;
 	}
 

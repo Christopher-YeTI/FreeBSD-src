@@ -1,5 +1,4 @@
 #!/bin/sh
-# shellcheck disable=SC2154
 #
 # CDDL HEADER START
 #
@@ -16,7 +15,7 @@
 # Send notification in response to a fault induced statechange
 #
 # ZEVENT_SUBCLASS: 'statechange'
-# ZEVENT_VDEV_STATE_STR: 'DEGRADED', 'FAULTED', 'REMOVED', or 'UNAVAIL'
+# ZEVENT_VDEV_STATE_STR: 'DEGRADED', 'FAULTED' or 'REMOVED'
 #
 # Exit codes:
 #   0: notification sent
@@ -32,13 +31,12 @@
 
 if [ "${ZEVENT_VDEV_STATE_STR}" != "FAULTED" ] \
         && [ "${ZEVENT_VDEV_STATE_STR}" != "DEGRADED" ] \
-        && [ "${ZEVENT_VDEV_STATE_STR}" != "REMOVED" ] \
-        && [ "${ZEVENT_VDEV_STATE_STR}" != "UNAVAIL" ]; then
+        && [ "${ZEVENT_VDEV_STATE_STR}" != "REMOVED" ]; then
     exit 3
 fi
 
 umask 077
-note_subject="ZFS device fault for pool ${ZEVENT_POOL} on $(hostname)"
+note_subject="ZFS device fault for pool ${ZEVENT_POOL_GUID} on $(hostname)"
 note_pathname="$(mktemp)"
 {
     if [ "${ZEVENT_VDEV_STATE_STR}" = "FAULTED" ] ; then
@@ -66,7 +64,7 @@ note_pathname="$(mktemp)"
     [ -n "${ZEVENT_VDEV_GUID}" ] && echo "  vguid: ${ZEVENT_VDEV_GUID}"
     [ -n "${ZEVENT_VDEV_DEVID}" ] && echo "  devid: ${ZEVENT_VDEV_DEVID}"
 
-    echo "   pool: ${ZEVENT_POOL} (${ZEVENT_POOL_GUID})"
+    echo "   pool: ${ZEVENT_POOL_GUID}"
 
 } > "${note_pathname}"
 

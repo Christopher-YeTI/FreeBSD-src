@@ -23,6 +23,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,7 +40,7 @@ struct zfs2bsd {
 	int		zb_bsd;
 };
 
-static const struct zfs2bsd perms[] = {{ACE_READ_DATA, ACL_READ_DATA},
+struct zfs2bsd perms[] = {{ACE_READ_DATA, ACL_READ_DATA},
 			{ACE_WRITE_DATA, ACL_WRITE_DATA},
 			{ACE_EXECUTE, ACL_EXECUTE},
 			{ACE_APPEND_DATA, ACL_APPEND_DATA},
@@ -53,7 +56,7 @@ static const struct zfs2bsd perms[] = {{ACE_READ_DATA, ACL_READ_DATA},
 			{ACE_SYNCHRONIZE, ACL_SYNCHRONIZE},
 			{0, 0}};
 
-static const struct zfs2bsd flags[] = {{ACE_FILE_INHERIT_ACE,
+struct zfs2bsd flags[] = {{ACE_FILE_INHERIT_ACE,
 			    ACL_ENTRY_FILE_INHERIT},
 			{ACE_DIRECTORY_INHERIT_ACE,
 			    ACL_ENTRY_DIRECTORY_INHERIT},
@@ -119,7 +122,7 @@ acl_from_aces(struct acl *aclp, const ace_t *aces, int nentries)
 		return (EINVAL);
 	}
 
-	memset(aclp, 0, sizeof (*aclp));
+	bzero(aclp, sizeof (*aclp));
 	aclp->acl_maxcnt = ACL_MAX_ENTRIES;
 	aclp->acl_cnt = nentries;
 
@@ -174,7 +177,7 @@ aces_from_acl(ace_t *aces, int *nentries, const struct acl *aclp)
 	const struct acl_entry *entry;
 	ace_t *ace;
 
-	memset(aces, 0, sizeof (*aces) * aclp->acl_cnt);
+	bzero(aces, sizeof (*aces) * aclp->acl_cnt);
 
 	*nentries = aclp->acl_cnt;
 

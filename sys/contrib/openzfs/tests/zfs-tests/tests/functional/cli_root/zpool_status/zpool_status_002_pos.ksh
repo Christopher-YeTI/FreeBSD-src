@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -51,7 +51,7 @@ else
 fi
 
 set -A args "" "-x" "-v" "-x $testpool" "-v $testpool" "-xv $testpool" \
-	"-vx $testpool" "-e $testpool" "-es $testpool"
+	"-vx $testpool"
 
 log_assert "Executing 'zpool status' with correct options succeeds"
 
@@ -63,7 +63,5 @@ while [[ $i -lt ${#args[*]} ]]; do
 
 	(( i = i + 1 ))
 done
-
-cleanup 
 
 log_pass "'zpool status' with correct options succeeded"

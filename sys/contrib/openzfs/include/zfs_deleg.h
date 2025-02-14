@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -25,7 +25,7 @@
  */
 
 #ifndef	_ZFS_DELEG_H
-#define	_ZFS_DELEG_H extern __attribute__((visibility("default")))
+#define	_ZFS_DELEG_H
 
 #include <sys/fs/zfs.h>
 
@@ -81,16 +81,16 @@ typedef enum {
 } zfs_deleg_note_t;
 
 typedef struct zfs_deleg_perm_tab {
-	const char *z_perm;
+	char *z_perm;
 	zfs_deleg_note_t z_note;
 } zfs_deleg_perm_tab_t;
 
-_ZFS_DELEG_H const zfs_deleg_perm_tab_t zfs_deleg_perm_tab[];
+extern zfs_deleg_perm_tab_t zfs_deleg_perm_tab[];
 
-_ZFS_DELEG_H int zfs_deleg_verify_nvlist(nvlist_t *nvlist);
-_ZFS_DELEG_H void zfs_deleg_whokey(char *attr, zfs_deleg_who_type_t type,
+int zfs_deleg_verify_nvlist(nvlist_t *nvlist);
+void zfs_deleg_whokey(char *attr, zfs_deleg_who_type_t type,
     char checkflag, void *data);
-_ZFS_DELEG_H const char *zfs_deleg_canonicalize_perm(const char *perm);
+const char *zfs_deleg_canonicalize_perm(const char *perm);
 
 #ifdef	__cplusplus
 }

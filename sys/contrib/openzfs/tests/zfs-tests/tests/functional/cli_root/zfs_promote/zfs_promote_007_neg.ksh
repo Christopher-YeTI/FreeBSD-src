@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,7 +47,8 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists $snap && destroy_dataset $snap -rR
+	snapexists $snap && \
+		log_must zfs destroy -rR $snap
 
 	typeset data
 	for data in $TESTDIR/$TESTFILE0 $TESTDIR/$TESTFILE1; do

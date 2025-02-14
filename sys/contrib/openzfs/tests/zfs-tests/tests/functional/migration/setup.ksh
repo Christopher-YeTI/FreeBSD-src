@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -57,7 +57,8 @@ log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 rm -rf $NONZFS_TESTDIR  || log_unresolved Could not remove $NONZFS_TESTDIR
 mkdir -p $NONZFS_TESTDIR || log_unresolved Could not create $NONZFS_TESTDIR
 
-new_fs ${DEV_DSKDIR}/$NONZFS_DISK ||
+new_fs ${DEV_DSKDIR}/$NONZFS_DISK
+(( $? != 0 )) &&
 	log_untested "Unable to setup a $NEWFS_DEFAULT_FS file system"
 
 log_must mount ${DEV_DSKDIR}/$NONZFS_DISK $NONZFS_TESTDIR

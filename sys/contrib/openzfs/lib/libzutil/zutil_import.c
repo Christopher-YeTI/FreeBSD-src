@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -47,10 +47,7 @@
  * using our derived config, and record the results.
  */
 
-#ifdef HAVE_AIO_H
 #include <aio.h>
-#endif
-#define TEXT_DOMAIN "zfs"
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -72,31 +69,8 @@
 
 #include "zutil_import.h"
 
-const char *
-libpc_error_description(libpc_handle_t *hdl)
-{
-	if (hdl->lpc_desc[0] != '\0')
-		return (hdl->lpc_desc);
-
-	switch (hdl->lpc_error) {
-	case LPC_BADCACHE:
-		return (dgettext(TEXT_DOMAIN, "invalid or missing cache file"));
-	case LPC_BADPATH:
-		return (dgettext(TEXT_DOMAIN, "must be an absolute path"));
-	case LPC_NOMEM:
-		return (dgettext(TEXT_DOMAIN, "out of memory"));
-	case LPC_EACCESS:
-		return (dgettext(TEXT_DOMAIN, "some devices require root "
-		    "privileges"));
-	case LPC_UNKNOWN:
-		return (dgettext(TEXT_DOMAIN, "unknown error"));
-	default:
-		assert(hdl->lpc_error == 0);
-		return (dgettext(TEXT_DOMAIN, "no error"));
-	}
-}
-
-static __attribute__((format(printf, 2, 3))) void
+/*PRINTFLIKE2*/
+static void
 zutil_error_aux(libpc_handle_t *hdl, const char *fmt, ...)
 {
 	va_list ap;
@@ -110,27 +84,29 @@ zutil_error_aux(libpc_handle_t *hdl, const char *fmt, ...)
 }
 
 static void
-zutil_verror(libpc_handle_t *hdl, lpc_error_t error, const char *fmt,
+zutil_verror(libpc_handle_t *hdl, const char *error, const char *fmt,
     va_list ap)
 {
 	char action[1024];
 
 	(void) vsnprintf(action, sizeof (action), fmt, ap);
-	hdl->lpc_error = error;
 
 	if (hdl->lpc_desc_active)
 		hdl->lpc_desc_active = B_FALSE;
 	else
 		hdl->lpc_desc[0] = '\0';
 
-	if (hdl->lpc_printerr)
-		(void) fprintf(stderr, "%s: %s\n", action,
-		    libpc_error_description(hdl));
+	if (hdl->lpc_printerr) {
+		if (hdl->lpc_desc[0] != '\0')
+			error = hdl->lpc_desc;
+
+		(void) fprintf(stderr, "%s: %s\n", action, error);
+	}
 }
 
-static __attribute__((format(printf, 3, 4))) int
-zutil_error_fmt(libpc_handle_t *hdl, lpc_error_t error,
-    const char *fmt, ...)
+/*PRINTFLIKE3*/
+static int
+zutil_error_fmt(libpc_handle_t *hdl, const char *error, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -144,7 +120,7 @@ zutil_error_fmt(libpc_handle_t *hdl, lpc_error_t error,
 }
 
 static int
-zutil_error(libpc_handle_t *hdl, lpc_error_t error, const char *msg)
+zutil_error(libpc_handle_t *hdl, const char *error, const char *msg)
 {
 	return (zutil_error_fmt(hdl, error, "%s", msg));
 }
@@ -152,7 +128,7 @@ zutil_error(libpc_handle_t *hdl, lpc_error_t error, const char *msg)
 static int
 zutil_no_memory(libpc_handle_t *hdl)
 {
-	zutil_error(hdl, LPC_NOMEM, "internal error");
+	zutil_error(hdl, EZFS_NOMEM, "internal error");
 	exit(1);
 }
 
@@ -173,17 +149,6 @@ zutil_strdup(libpc_handle_t *hdl, const char *str)
 	char *ret;
 
 	if ((ret = strdup(str)) == NULL)
-		(void) zutil_no_memory(hdl);
-
-	return (ret);
-}
-
-static char *
-zutil_strndup(libpc_handle_t *hdl, const char *str, size_t n)
-{
-	char *ret;
-
-	if ((ret = strndup(str, n)) == NULL)
 		(void) zutil_no_memory(hdl);
 
 	return (ret);
@@ -234,7 +199,7 @@ fix_paths(libpc_handle_t *hdl, nvlist_t *nv, name_entry_t *names)
 	uint_t c, children;
 	uint64_t guid;
 	name_entry_t *ne, *best;
-	const char *path;
+	char *path;
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
@@ -498,13 +463,15 @@ get_configs(libpc_handle_t *hdl, pool_list_t *pl, boolean_t active_ok,
 	uint_t i, nspares, nl2cache;
 	boolean_t config_seen;
 	uint64_t best_txg;
-	const char *name, *hostname = NULL;
+	char *name, *hostname = NULL;
 	uint64_t guid;
 	uint_t children = 0;
 	nvlist_t **child = NULL;
+	uint_t holes;
 	uint64_t *hole_array, max_id;
 	uint_t c;
 	boolean_t isactive;
+	uint64_t hostid;
 	nvlist_t *nvl;
 	boolean_t valid_top_config = B_FALSE;
 
@@ -512,8 +479,7 @@ get_configs(libpc_handle_t *hdl, pool_list_t *pl, boolean_t active_ok,
 		goto nomem;
 
 	for (pe = pl->pools; pe != NULL; pe = pe->pe_next) {
-		uint64_t id, max_txg = 0, hostid = 0;
-		uint_t holes = 0;
+		uint64_t id, max_txg = 0;
 
 		if (nvlist_alloc(&config, NV_UNIQUE_NAME, 0) != 0)
 			goto nomem;
@@ -592,8 +558,8 @@ get_configs(libpc_handle_t *hdl, pool_list_t *pl, boolean_t active_ok,
 				 *	hostname (if available)
 				 */
 				uint64_t state, version;
-				const char *comment = NULL;
-				const char *compatibility = NULL;
+				char *comment = NULL;
+				char *compatibility = NULL;
 
 				version = fnvlist_lookup_uint64(tmp,
 				    ZPOOL_CONFIG_VERSION);
@@ -774,7 +740,7 @@ get_configs(libpc_handle_t *hdl, pool_list_t *pl, boolean_t active_ok,
 		    nvlist_add_uint64(nvroot, ZPOOL_CONFIG_ID, 0ULL) != 0 ||
 		    nvlist_add_uint64(nvroot, ZPOOL_CONFIG_GUID, guid) != 0 ||
 		    nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-		    (const nvlist_t **)child, children) != 0) {
+		    child, children) != 0) {
 			nvlist_free(nvroot);
 			goto nomem;
 		}
@@ -935,6 +901,7 @@ zpool_read_label_slow(int fd, nvlist_t **config, int *num_labels)
 	vdev_phys_t *label;
 	nvlist_t *expected_config = NULL;
 	uint64_t expected_guid = 0, size;
+	int error;
 
 	*config = NULL;
 
@@ -942,9 +909,8 @@ zpool_read_label_slow(int fd, nvlist_t **config, int *num_labels)
 		return (0);
 	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
 
-	label = (vdev_phys_t *)umem_alloc_aligned(sizeof (*label), PAGESIZE,
-	    UMEM_DEFAULT);
-	if (label == NULL)
+	error = posix_memalign((void **)&label, PAGESIZE, sizeof (*label));
+	if (error)
 		return (-1);
 
 	for (l = 0; l < VDEV_LABELS; l++) {
@@ -993,7 +959,7 @@ zpool_read_label_slow(int fd, nvlist_t **config, int *num_labels)
 	if (num_labels != NULL)
 		*num_labels = count;
 
-	umem_free_aligned(label, sizeof (*label));
+	free(label);
 	*config = expected_config;
 
 	return (0);
@@ -1007,9 +973,6 @@ zpool_read_label_slow(int fd, nvlist_t **config, int *num_labels)
 int
 zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 {
-#ifndef HAVE_AIO_H
-	return (zpool_read_label_slow(fd, config, num_labels));
-#else
 	struct stat64 statbuf;
 	struct aiocb aiocbs[VDEV_LABELS];
 	struct aiocb *aiocbps[VDEV_LABELS];
@@ -1024,9 +987,9 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 		return (0);
 	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
 
-	labels = (vdev_phys_t *)umem_alloc_aligned(
-	    VDEV_LABELS * sizeof (*labels), PAGESIZE, UMEM_DEFAULT);
-	if (labels == NULL)
+	error = posix_memalign((void **)&labels, PAGESIZE,
+	    VDEV_LABELS * sizeof (*labels));
+	if (error)
 		return (-1);
 
 	memset(aiocbs, 0, sizeof (aiocbs));
@@ -1057,26 +1020,12 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 				case EINVAL:
 					break;
 				case EINPROGRESS:
-					/*
-					 * This shouldn't be possible to
-					 * encounter, die if we do.
-					 */
+					// This shouldn't be possible to
+					// encounter, die if we do.
 					ASSERT(B_FALSE);
-					zfs_fallthrough;
-				case EREMOTEIO:
-					/*
-					 * May be returned by an NVMe device
-					 * which is visible in /dev/ but due
-					 * to a low-level format change, or
-					 * other error, needs to be rescanned.
-					 * Try the slow method.
-					 */
-					zfs_fallthrough;
-				case EAGAIN:
 				case EOPNOTSUPP:
 				case ENOSYS:
 					do_slow = B_TRUE;
-					zfs_fallthrough;
 				case 0:
 				default:
 					(void) aio_return(&aiocbs[l]);
@@ -1091,7 +1040,7 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 			error = zpool_read_label_slow(fd, config, num_labels);
 			saved_errno = errno;
 		}
-		umem_free_aligned(labels, VDEV_LABELS * sizeof (*labels));
+		free(labels);
 		errno = saved_errno;
 		return (error);
 	}
@@ -1140,11 +1089,10 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 	if (num_labels != NULL)
 		*num_labels = count;
 
-	umem_free_aligned(labels, VDEV_LABELS * sizeof (*labels));
+	free(labels);
 	*config = expected_config;
 
 	return (0);
-#endif
 }
 
 /*
@@ -1174,12 +1122,12 @@ slice_cache_compare(const void *arg1, const void *arg2)
 
 static int
 label_paths_impl(libpc_handle_t *hdl, nvlist_t *nvroot, uint64_t pool_guid,
-    uint64_t vdev_guid, const char **path, const char **devid)
+    uint64_t vdev_guid, char **path, char **devid)
 {
 	nvlist_t **child;
 	uint_t c, children;
 	uint64_t guid;
-	const char *val;
+	char *val;
 	int error;
 
 	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
@@ -1217,32 +1165,18 @@ label_paths_impl(libpc_handle_t *hdl, nvlist_t *nvroot, uint64_t pool_guid,
  * The returned pointers are only valid as long as label remains valid.
  */
 int
-label_paths(libpc_handle_t *hdl, nvlist_t *label, const char **path,
-    const char **devid)
+label_paths(libpc_handle_t *hdl, nvlist_t *label, char **path, char **devid)
 {
 	nvlist_t *nvroot;
 	uint64_t pool_guid;
 	uint64_t vdev_guid;
-	uint64_t state;
 
 	*path = NULL;
 	*devid = NULL;
-	if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID, &vdev_guid) != 0)
-		return (ENOENT);
-
-	/*
-	 * In case of spare or l2cache, we directly return path/devid from the
-	 * label.
-	 */
-	if (!(nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE, &state)) &&
-	    (state == POOL_STATE_SPARE || state == POOL_STATE_L2CACHE)) {
-		(void) nvlist_lookup_string(label, ZPOOL_CONFIG_PATH, path);
-		(void) nvlist_lookup_string(label, ZPOOL_CONFIG_DEVID, devid);
-		return (0);
-	}
 
 	if (nvlist_lookup_nvlist(label, ZPOOL_CONFIG_VDEV_TREE, &nvroot) ||
-	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID, &pool_guid))
+	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID, &pool_guid) ||
+	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID, &vdev_guid))
 		return (ENOENT);
 
 	return (label_paths_impl(hdl, nvroot, pool_guid, vdev_guid, path,
@@ -1292,38 +1226,26 @@ zpool_find_import_scan_dir(libpc_handle_t *hdl, pthread_mutex_t *lock,
 		if (error == ENOENT)
 			return (0);
 
-		zutil_error_aux(hdl, "%s", zfs_strerror(error));
-		(void) zutil_error_fmt(hdl, LPC_BADPATH, dgettext(TEXT_DOMAIN,
-		    "cannot resolve path '%s'"), dir);
+		zutil_error_aux(hdl, strerror(error));
+		(void) zutil_error_fmt(hdl, EZFS_BADPATH, dgettext(
+		    TEXT_DOMAIN, "cannot resolve path '%s'"), dir);
 		return (error);
 	}
 
 	dirp = opendir(path);
 	if (dirp == NULL) {
 		error = errno;
-		zutil_error_aux(hdl, "%s", zfs_strerror(error));
-		(void) zutil_error_fmt(hdl, LPC_BADPATH, dgettext(TEXT_DOMAIN,
-		    "cannot open '%s'"), path);
+		zutil_error_aux(hdl, strerror(error));
+		(void) zutil_error_fmt(hdl, EZFS_BADPATH,
+		    dgettext(TEXT_DOMAIN, "cannot open '%s'"), path);
 		return (error);
 	}
 
 	while ((dp = readdir64(dirp)) != NULL) {
 		const char *name = dp->d_name;
-		if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+		if (name[0] == '.' &&
+		    (name[1] == 0 || (name[1] == '.' && name[2] == 0)))
 			continue;
-
-		switch (dp->d_type) {
-		case DT_UNKNOWN:
-		case DT_BLK:
-		case DT_LNK:
-#ifdef __FreeBSD__
-		case DT_CHR:
-#endif
-		case DT_REG:
-			break;
-		default:
-			continue;
-		}
 
 		zpool_find_import_scan_add_slice(hdl, lock, cache, path, name,
 		    order);
@@ -1339,22 +1261,20 @@ zpool_find_import_scan_path(libpc_handle_t *hdl, pthread_mutex_t *lock,
 {
 	int error = 0;
 	char path[MAXPATHLEN];
-	char *d = NULL;
-	ssize_t dl;
-	const char *dpath, *name;
+	char *d, *b;
+	char *dpath, *name;
 
 	/*
-	 * Separate the directory and the basename.
-	 * We do this so that we can get the realpath of
+	 * Separate the directory part and last part of the
+	 * path. We do this so that we can get the realpath of
 	 * the directory. We don't get the realpath on the
 	 * whole path because if it's a symlink, we want the
 	 * path of the symlink not where it points to.
 	 */
-	name = zfs_basename(dir);
-	if ((dl = zfs_dirnamelen(dir)) == -1)
-		dpath = ".";
-	else
-		dpath = d = zutil_strndup(hdl, dir, dl);
+	d = zutil_strdup(hdl, dir);
+	b = zutil_strdup(hdl, dir);
+	dpath = dirname(d);
+	name = basename(b);
 
 	if (realpath(dpath, path) == NULL) {
 		error = errno;
@@ -1363,15 +1283,16 @@ zpool_find_import_scan_path(libpc_handle_t *hdl, pthread_mutex_t *lock,
 			goto out;
 		}
 
-		zutil_error_aux(hdl, "%s", zfs_strerror(error));
-		(void) zutil_error_fmt(hdl, LPC_BADPATH, dgettext(TEXT_DOMAIN,
-		    "cannot resolve path '%s'"), dir);
+		zutil_error_aux(hdl, strerror(error));
+		(void) zutil_error_fmt(hdl, EZFS_BADPATH, dgettext(
+		    TEXT_DOMAIN, "cannot resolve path '%s'"), dir);
 		goto out;
 	}
 
 	zpool_find_import_scan_add_slice(hdl, lock, cache, path, name, order);
 
 out:
+	free(b);
 	free(d);
 	return (error);
 }
@@ -1401,8 +1322,8 @@ zpool_find_import_scan(libpc_handle_t *hdl, pthread_mutex_t *lock,
 			if (error == ENOENT)
 				continue;
 
-			zutil_error_aux(hdl, "%s", zfs_strerror(error));
-			(void) zutil_error_fmt(hdl, LPC_BADPATH, dgettext(
+			zutil_error_aux(hdl, strerror(error));
+			(void) zutil_error_fmt(hdl, EZFS_BADPATH, dgettext(
 			    TEXT_DOMAIN, "cannot resolve path '%s'"), dir[i]);
 			goto error;
 		}
@@ -1448,7 +1369,6 @@ static nvlist_t *
 zpool_find_import_impl(libpc_handle_t *hdl, importargs_t *iarg,
     pthread_mutex_t *lock, avl_tree_t *cache)
 {
-	(void) lock;
 	nvlist_t *ret = NULL;
 	pool_list_t pools = { 0 };
 	pool_entry_t *pe, *penext;
@@ -1466,21 +1386,7 @@ zpool_find_import_impl(libpc_handle_t *hdl, importargs_t *iarg,
 	 * validating labels, a large number of threads can be used due to
 	 * minimal contention.
 	 */
-	long threads = 2 * sysconf(_SC_NPROCESSORS_ONLN);
-#ifdef HAVE_AIO_H
-	long am;
-#ifdef _SC_AIO_LISTIO_MAX
-	am = sysconf(_SC_AIO_LISTIO_MAX);
-	if (am >= VDEV_LABELS)
-		threads = MIN(threads, am / VDEV_LABELS);
-#endif
-#ifdef _SC_AIO_MAX
-	am = sysconf(_SC_AIO_MAX);
-	if (am >= VDEV_LABELS)
-		threads = MIN(threads, am / VDEV_LABELS);
-#endif
-#endif
-	t = tpool_create(1, threads, 0, NULL);
+	t = tpool_create(1, 2 * sysconf(_SC_NPROCESSORS_ONLN), 0, NULL);
 	for (slice = avl_first(cache); slice;
 	    (slice = avl_walk(cache, slice, AVL_AFTER)))
 		(void) tpool_dispatch(t, zpool_open_func, slice);
@@ -1514,7 +1420,7 @@ zpool_find_import_impl(libpc_handle_t *hdl, importargs_t *iarg,
 			}
 
 			if (iarg->poolname != NULL && !aux) {
-				const char *pname;
+				char *pname;
 
 				matched = nvlist_lookup_string(config,
 				    ZPOOL_CONFIG_POOL_NAME, &pname) == 0 &&
@@ -1588,8 +1494,7 @@ static int
 discover_cached_paths(libpc_handle_t *hdl, nvlist_t *nv,
     avl_tree_t *cache, pthread_mutex_t *lock)
 {
-	const char *path = NULL;
-	ssize_t dl;
+	char *path = NULL;
 	uint_t children;
 	nvlist_t **child;
 
@@ -1605,21 +1510,8 @@ discover_cached_paths(libpc_handle_t *hdl, nvlist_t *nv,
 	 * our directory cache.
 	 */
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
-		int ret;
-		char c = '\0';
-		if ((dl = zfs_dirnamelen(path)) == -1) {
-			path = ".";
-		} else {
-			c = path[dl];
-			((char *)path)[dl] = '\0';
-
-		}
-		ret = zpool_find_import_scan_dir(hdl, lock, cache,
-		    path, 0);
-		if (c != '\0')
-			((char *)path)[dl] = c;
-
-		return (ret);
+		return (zpool_find_import_scan_dir(hdl, lock, cache,
+		    dirname(path), 0));
 	}
 	return (0);
 }
@@ -1638,24 +1530,24 @@ zpool_find_import_cached(libpc_handle_t *hdl, importargs_t *iarg)
 	nvlist_t *raw, *src, *dst;
 	nvlist_t *pools;
 	nvpair_t *elem;
-	const char *name;
+	char *name;
 	uint64_t this_guid;
 	boolean_t active;
 
 	verify(iarg->poolname == NULL || iarg->guid == 0);
 
 	if ((fd = open(iarg->cachefile, O_RDONLY | O_CLOEXEC)) < 0) {
-		zutil_error_aux(hdl, "%s", zfs_strerror(errno));
-		(void) zutil_error(hdl, LPC_BADCACHE, dgettext(TEXT_DOMAIN,
-		    "failed to open cache file"));
+		zutil_error_aux(hdl, "%s", strerror(errno));
+		(void) zutil_error(hdl, EZFS_BADCACHE,
+		    dgettext(TEXT_DOMAIN, "failed to open cache file"));
 		return (NULL);
 	}
 
 	if (fstat64(fd, &statbuf) != 0) {
-		zutil_error_aux(hdl, "%s", zfs_strerror(errno));
+		zutil_error_aux(hdl, "%s", strerror(errno));
 		(void) close(fd);
-		(void) zutil_error(hdl, LPC_BADCACHE, dgettext(TEXT_DOMAIN,
-		    "failed to get size of cache file"));
+		(void) zutil_error(hdl, EZFS_BADCACHE,
+		    dgettext(TEXT_DOMAIN, "failed to get size of cache file"));
 		return (NULL);
 	}
 
@@ -1667,7 +1559,8 @@ zpool_find_import_cached(libpc_handle_t *hdl, importargs_t *iarg)
 	if (read(fd, buf, statbuf.st_size) != statbuf.st_size) {
 		(void) close(fd);
 		free(buf);
-		(void) zutil_error(hdl, LPC_BADCACHE, dgettext(TEXT_DOMAIN,
+		(void) zutil_error(hdl, EZFS_BADCACHE,
+		    dgettext(TEXT_DOMAIN,
 		    "failed to read cache file contents"));
 		return (NULL);
 	}
@@ -1676,7 +1569,8 @@ zpool_find_import_cached(libpc_handle_t *hdl, importargs_t *iarg)
 
 	if (nvlist_unpack(buf, statbuf.st_size, &raw, 0) != 0) {
 		free(buf);
-		(void) zutil_error(hdl, LPC_BADCACHE, dgettext(TEXT_DOMAIN,
+		(void) zutil_error(hdl, EZFS_BADCACHE,
+		    dgettext(TEXT_DOMAIN,
 		    "invalid or corrupt cache file contents"));
 		return (NULL);
 	}
@@ -1764,8 +1658,6 @@ zpool_find_import_cached(libpc_handle_t *hdl, importargs_t *iarg)
 			 * caller.
 			 */
 			nvpair_t *pair = nvlist_next_nvpair(nv, NULL);
-			if (pair == NULL)
-				continue;
 			fnvlist_add_nvlist(pools, nvpair_name(pair),
 			    fnvpair_value_nvlist(pair));
 
@@ -1783,8 +1675,6 @@ zpool_find_import_cached(libpc_handle_t *hdl, importargs_t *iarg)
 			nvlist_free(pools);
 			return (NULL);
 		}
-
-		update_vdevs_config_dev_sysfs_path(src);
 
 		if ((dst = zutil_refresh_config(hdl, src)) == NULL) {
 			nvlist_free(raw);
@@ -1847,20 +1737,26 @@ zpool_find_import(libpc_handle_t *hdl, importargs_t *iarg)
 
 
 nvlist_t *
-zpool_search_import(libpc_handle_t *hdl, importargs_t *import)
+zpool_search_import(void *hdl, importargs_t *import,
+    const pool_config_ops_t *pco)
 {
+	libpc_handle_t handle = { 0 };
 	nvlist_t *pools = NULL;
+
+	handle.lpc_lib_handle = hdl;
+	handle.lpc_ops = pco;
+	handle.lpc_printerr = B_TRUE;
 
 	verify(import->poolname == NULL || import->guid == 0);
 
 	if (import->cachefile != NULL)
-		pools = zpool_find_import_cached(hdl, import);
+		pools = zpool_find_import_cached(&handle, import);
 	else
-		pools = zpool_find_import(hdl, import);
+		pools = zpool_find_import(&handle, import);
 
 	if ((pools == NULL || nvlist_empty(pools)) &&
-	    hdl->lpc_open_access_error && geteuid() != 0) {
-		(void) zutil_error(hdl, LPC_EACCESS, dgettext(TEXT_DOMAIN,
+	    handle.lpc_open_access_error && geteuid() != 0) {
+		(void) zutil_error(&handle, EZFS_EACESS, dgettext(TEXT_DOMAIN,
 		    "no pools found"));
 	}
 
@@ -1868,10 +1764,10 @@ zpool_search_import(libpc_handle_t *hdl, importargs_t *import)
 }
 
 static boolean_t
-pool_match(nvlist_t *cfg, const char *tgt)
+pool_match(nvlist_t *cfg, char *tgt)
 {
 	uint64_t v, guid = strtoull(tgt, NULL, 0);
-	const char *s;
+	char *s;
 
 	if (guid != 0) {
 		if (nvlist_lookup_uint64(cfg, ZPOOL_CONFIG_POOL_GUID, &v) == 0)
@@ -1884,25 +1780,25 @@ pool_match(nvlist_t *cfg, const char *tgt)
 }
 
 int
-zpool_find_config(libpc_handle_t *hdl, const char *target, nvlist_t **configp,
-    importargs_t *args)
+zpool_find_config(void *hdl, const char *target, nvlist_t **configp,
+    importargs_t *args, const pool_config_ops_t *pco)
 {
 	nvlist_t *pools;
 	nvlist_t *match = NULL;
 	nvlist_t *config = NULL;
 	char *sepp = NULL;
+	char sep = '\0';
 	int count = 0;
 	char *targetdup = strdup(target);
 
-	if (targetdup == NULL)
-		return (ENOMEM);
-
 	*configp = NULL;
 
-	if ((sepp = strpbrk(targetdup, "/@")) != NULL)
+	if ((sepp = strpbrk(targetdup, "/@")) != NULL) {
+		sep = *sepp;
 		*sepp = '\0';
+	}
 
-	pools = zpool_search_import(hdl, args);
+	pools = zpool_search_import(hdl, args, pco);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;
@@ -1936,168 +1832,4 @@ zpool_find_config(libpc_handle_t *hdl, const char *target, nvlist_t **configp,
 	free(targetdup);
 
 	return (0);
-}
-
-/* Return if a vdev is a leaf vdev.  Note: draid spares are leaf vdevs. */
-static boolean_t
-vdev_is_leaf(nvlist_t *nv)
-{
-	uint_t children = 0;
-	nvlist_t **child;
-
-	(void) nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children);
-
-	return (children == 0);
-}
-
-/* Return if a vdev is a leaf vdev and a real device (disk or file) */
-static boolean_t
-vdev_is_real_leaf(nvlist_t *nv)
-{
-	const char *type = NULL;
-	if (!vdev_is_leaf(nv))
-		return (B_FALSE);
-
-	(void) nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type);
-	if ((strcmp(type, VDEV_TYPE_DISK) == 0) ||
-	    (strcmp(type, VDEV_TYPE_FILE) == 0)) {
-		return (B_TRUE);
-	}
-
-	return (B_FALSE);
-}
-
-/*
- * This function is called by our FOR_EACH_VDEV() macros.
- *
- * state:   State machine status (stored inside of a (nvlist_t *))
- * nv:	     The current vdev nvlist_t we are iterating over.
- * last_nv: The previous vdev nvlist_t we returned to the user in
- *          the last iteration of FOR_EACH_VDEV().  We use it
- *          to find the next vdev nvlist_t we should return.
- * real_leaves_only: Only return leaf vdevs.
- *
- * Returns 1 if we found the next vdev nvlist_t for this iteration.  0 if
- * we're still searching for it.
- */
-static int
-__for_each_vdev_macro_helper_func(void *state, nvlist_t *nv, void *last_nv,
-    boolean_t real_leaves_only)
-{
-	enum {FIRST_NV = 0, NEXT_IS_MATCH = 1, STOP_LOOKING = 2};
-
-	/* The very first entry in the NV list is a special case */
-	if (*((nvlist_t **)state) == (nvlist_t *)FIRST_NV) {
-		if (real_leaves_only && !vdev_is_real_leaf(nv))
-			return (0);
-
-		*((nvlist_t **)last_nv) = nv;
-		*((nvlist_t **)state) = (nvlist_t *)STOP_LOOKING;
-		return (1);
-	}
-
-	/*
-	 * We came across our last_nv, meaning the next one is the one we
-	 * want
-	 */
-	if (nv == *((nvlist_t **)last_nv)) {
-		/* Next iteration of this function will return the nvlist_t */
-		*((nvlist_t **)state) = (nvlist_t *)NEXT_IS_MATCH;
-		return (0);
-	}
-
-	/*
-	 * We marked NEXT_IS_MATCH on the previous iteration, so this is the one
-	 * we want.
-	 */
-	if (*(nvlist_t **)state == (nvlist_t *)NEXT_IS_MATCH) {
-		if (real_leaves_only && !vdev_is_real_leaf(nv))
-			return (0);
-
-		*((nvlist_t **)last_nv) = nv;
-		*((nvlist_t **)state) = (nvlist_t *)STOP_LOOKING;
-		return (1);
-	}
-
-	return (0);
-}
-
-int
-for_each_vdev_macro_helper_func(void *state, nvlist_t *nv, void *last_nv)
-{
-	return (__for_each_vdev_macro_helper_func(state, nv, last_nv, B_FALSE));
-}
-
-int
-for_each_real_leaf_vdev_macro_helper_func(void *state, nvlist_t *nv,
-    void *last_nv)
-{
-	return (__for_each_vdev_macro_helper_func(state, nv, last_nv, B_TRUE));
-}
-
-/*
- * Internal function for iterating over the vdevs.
- *
- * For each vdev, func() will be called and will be passed 'zhp' (which is
- * typically the zpool_handle_t cast as a void pointer), the vdev's nvlist, and
- * a user-defined data pointer).
- *
- * The return values from all the func() calls will be OR'd together and
- * returned.
- */
-int
-for_each_vdev_cb(void *zhp, nvlist_t *nv, pool_vdev_iter_f func,
-    void *data)
-{
-	nvlist_t **child;
-	uint_t c, children;
-	int ret = 0;
-	int i;
-	const char *type;
-
-	const char *list[] = {
-	    ZPOOL_CONFIG_SPARES,
-	    ZPOOL_CONFIG_L2CACHE,
-	    ZPOOL_CONFIG_CHILDREN
-	};
-
-	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
-		return (ret);
-
-	/* Don't run our function on indirect vdevs */
-	if (strcmp(type, VDEV_TYPE_INDIRECT) != 0) {
-		ret |= func(zhp, nv, data);
-	}
-
-	for (i = 0; i < ARRAY_SIZE(list); i++) {
-		if (nvlist_lookup_nvlist_array(nv, list[i], &child,
-		    &children) == 0) {
-			for (c = 0; c < children; c++) {
-				uint64_t ishole = 0;
-
-				(void) nvlist_lookup_uint64(child[c],
-				    ZPOOL_CONFIG_IS_HOLE, &ishole);
-
-				if (ishole)
-					continue;
-
-				ret |= for_each_vdev_cb(zhp, child[c],
-				    func, data);
-			}
-		}
-	}
-
-	return (ret);
-}
-
-/*
- * Given an ZPOOL_CONFIG_VDEV_TREE nvpair, iterate over all the vdevs, calling
- * func() for each one.  func() is passed the vdev's nvlist and an optional
- * user-defined 'data' pointer.
- */
-int
-for_each_vdev_in_nvlist(nvlist_t *nvroot, pool_vdev_iter_f func, void *data)
-{
-	return (for_each_vdev_cb(NULL, nvroot, func, data));
 }

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -55,7 +55,10 @@ function cleanup
 	#
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "online"
+		check_state $TESTPOOL $disk "online"
+		if [[ $? != 0 ]]; then
+			log_fail "Unable to online $disk"
+		fi
 
 	done
 }
@@ -76,10 +79,16 @@ for disk in $DISKLIST; do
 	while [[ $i -lt ${#args[*]} ]]; do
 		if (( j < num )) ; then
 			log_must zpool offline ${args[$i]} $TESTPOOL $disk
-			log_must check_state $TESTPOOL $disk "offline"
+			check_state $TESTPOOL $disk "offline"
+			if [[ $? != 0 ]]; then
+				log_fail "$disk of $TESTPOOL did not match offline state"
+			fi
 		else
 			log_mustnot zpool offline ${args[$i]} $TESTPOOL $disk
-			log_must check_state $TESTPOOL $disk "online"
+			check_state $TESTPOOL $disk "online"
+			if [[ $? != 0 ]]; then
+				log_fail "$disk of $TESTPOOL did not match online state"
+			fi
 		fi
 
 		(( i = i + 1 ))
@@ -97,13 +106,19 @@ for disk in $DISKLIST; do
         while [[ $i -lt $iters ]]; do
 		index=`expr $RANDOM % ${#args[*]}`
                 log_must zpool offline ${args[$index]} $TESTPOOL $disk
-                log_must check_state $TESTPOOL $disk "offline"
+                check_state $TESTPOOL $disk "offline"
+                if [[ $? != 0 ]]; then
+                        log_fail "$disk of $TESTPOOL is not offline."
+                fi
 
                 (( i = i + 1 ))
         done
 
 	log_must zpool online $TESTPOOL $disk
-	log_must check_state $TESTPOOL $disk "online"
+	check_state $TESTPOOL $disk "online"
+	if [[ $? != 0 ]]; then
+		log_fail "$disk of $TESTPOOL did not match online state"
+	fi
 done
 
 log_pass "'zpool offline -f' succeeded"

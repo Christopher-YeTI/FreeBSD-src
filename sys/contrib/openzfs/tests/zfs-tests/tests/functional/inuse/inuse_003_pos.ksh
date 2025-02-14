@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -58,21 +58,25 @@ function cleanup
 
 	log_note "Kill off ufsdump process if still running"
 	kill -0 $PIDUFSDUMP > /dev/null 2>&1 && \
-	    log_must eval "kill -9 $PIDUFSDUMP"
+	    log_must kill -9 $PIDUFSDUMP  > /dev/null 2>&1
 	#
 	# Note: It would appear that ufsdump spawns a number of processes
 	# which are not killed when the $PIDUFSDUMP is whacked.  So best bet
 	# is to find the rest of the them and deal with them individually.
 	#
-	kill -9 `pgrep ufsdump` > /dev/null 2>&1
+	for all in `pgrep ufsdump`
+	do
+		kill -9 $all > /dev/null 2>&1
+	done
 
 	log_note "Kill off ufsrestore process if still running"
 	kill -0 $PIDUFSRESTORE > /dev/null 2>&1 && \
-	    log_must eval "kill -9 $PIDUFSRESTORE"
+	    log_must kill -9 $PIDUFSRESTORE  > /dev/null 2>&1
 
 	ismounted $UFSMP ufs && log_must umount $UFSMP
 
-	rm -rf $UFSMP $TESTDIR
+	rm -rf $UFSMP
+	rm -rf $TESTDIR
 
 	#
 	# Tidy up the disks we used.
@@ -92,8 +96,8 @@ typeset -i filenum=0
 typeset cwd=""
 
 log_note "Make a ufs filesystem on source $rawdisk1"
-new_fs $rawdisk1 > /dev/null 2>&1 ||
-	log_untested "Unable to create ufs filesystem on $rawdisk1"
+new_fs $rawdisk1 > /dev/null 2>&1
+(($? != 0)) && log_untested "Unable to create ufs filesystem on $rawdisk1"
 
 log_must mkdir -p $UFSMP
 
@@ -104,9 +108,9 @@ log_note "Now create some directories and files to be ufsdump'ed"
 while (($dirnum <= 2)); do
 	log_must mkdir $bigdir${dirnum}
 	while (( $filenum <= 2 )); do
-		if ! file_write -o create -f $bigdir${dirnum}/file${filenum} \
+		file_write -o create -f $bigdir${dirnum}/file${filenum} \
 		    -b $BLOCK_SIZE -c $BLOCK_COUNT
-		then
+		if [[ $? -ne 0 ]]; then
 			if [[ $dirnum -lt 3 ]]; then
 				log_fail "file_write only wrote" \
 				    "<(( $dirnum * 3 + $filenum ))>" \
@@ -135,7 +139,9 @@ log_note "Attempt to take the source device in use by ufsdump as spare device"
 log_mustnot zpool create $TESTPOOL1 "$FS_DISK2" spare "$disk1"
 log_mustnot poolexists $TESTPOOL1
 
-wait $PIDUFSDUMP || log_fail "ufsdump failed with error code $?"
+wait $PIDUFSDUMP
+typeset -i retval=$?
+(($retval != 0)) && log_fail "ufsdump failed with error code $ret_val"
 
 log_must mount $disk1 $UFSMP
 

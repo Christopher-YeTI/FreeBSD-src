@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -69,7 +69,7 @@ rename_dataset ${vol}-new $vol
 
 clone=$TESTPOOL/${snap}_clone
 create_clone $vol@$snap $clone
-block_device_wait $VOLDATA
+block_device_wait
 
 #verify data integrity
 for input in $VOL_R_PATH $ZVOL_RDEVDIR/$clone; do

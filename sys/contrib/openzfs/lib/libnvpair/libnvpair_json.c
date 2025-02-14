@@ -15,7 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <wchar.h>
 #include <sys/debug.h>
 
@@ -46,9 +46,11 @@
 static int
 nvlist_print_json_string(FILE *fp, const char *input)
 {
-	mbstate_t mbr = {0};
+	mbstate_t mbr;
 	wchar_t c;
 	size_t sz;
+
+	bzero(&mbr, sizeof (mbr));
 
 	FPRINTF(fp, "\"");
 	while ((sz = mbrtowc(&c, input, MB_CUR_MAX, &mbr)) > 0) {
@@ -134,7 +136,7 @@ nvlist_print_json(FILE *fp, nvlist_t *nvl)
 
 		switch (type) {
 		case DATA_TYPE_STRING: {
-			const char *string = fnvpair_value_string(curr);
+			char *string = fnvpair_value_string(curr);
 			if (nvlist_print_json_string(fp, string) == -1)
 				return (-1);
 			break;
@@ -220,7 +222,7 @@ nvlist_print_json(FILE *fp, nvlist_t *nvl)
 		}
 
 		case DATA_TYPE_STRING_ARRAY: {
-			const char **val;
+			char **val;
 			uint_t valsz, i;
 			VERIFY0(nvpair_value_string_array(curr, &val, &valsz));
 			FPRINTF(fp, "[");

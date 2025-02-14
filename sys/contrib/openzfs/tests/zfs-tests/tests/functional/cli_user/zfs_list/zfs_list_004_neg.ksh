@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -29,7 +29,7 @@
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 #
 
-. $STF_SUITE/tests/functional/cli_user/zfs_list/zfs_list.kshlib
+. $STF_SUITE/include/libtest.shlib
 
 #
 # DESCRIPTION:
@@ -55,12 +55,8 @@ paths="$TESTPOOL/NONEXISTFS $TESTPOOL/$TESTFS/NONEXISTFS \
 cd /tmp
 
 for fs in $paths ; do
-    # In cases when ZFS is on root, /tmp will belong to ZFS and hence must be
-    # skipped
-    if ! is_fs_type_zfs $fs; then
-        log_mustnot zfs list $fs
-        log_mustnot zfs list -r $fs
-    fi
+	log_mustnot zfs list $fs
+	log_mustnot zfs list -r $fs
 done
 
 log_pass "'zfs list [-r]' fails while the given dataset/path does not exist " \

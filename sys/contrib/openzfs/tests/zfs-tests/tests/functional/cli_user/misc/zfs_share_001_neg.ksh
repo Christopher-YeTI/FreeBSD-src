@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -41,6 +41,7 @@
 # 1. Attempt to share a dataset
 # 2. Verify the dataset was not shared.
 #
+#
 
 verify_runnable "global"
 
@@ -50,11 +51,17 @@ fi
 
 log_assert "zfs share returns an error when run as a user"
 
-log_mustnot is_shared $TESTDIR/unshared
+if is_shared $TESTDIR/unshared
+then
+	log_fail "$TESTPOOL/$TESTFS/unshared was incorrectly shared initially!"
+fi
 
 log_mustnot zfs share $TESTPOOL/$TESTFS/unshared
 
 # Now verify that the above command didn't actually do anything
-log_mustnot is_shared $TESTDIR/unshared
+if is_shared $TESTDIR/unshared
+then
+	log_fail "$TESTPOOL/$TESTFS/unshared was actually shared!"
+fi
 
 log_pass "zfs share returns an error when run as a user"

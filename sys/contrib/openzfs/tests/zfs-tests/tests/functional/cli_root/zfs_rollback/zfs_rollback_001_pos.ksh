@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -76,14 +76,14 @@ function test_n_check #opt num_snap_clone num_rollback
 		pkill -x dd
 	fi
 
-	datasetexists $FS && destroy_dataset $FS -Rf
+	datasetexists $FS && log_must zfs destroy -Rf $FS
 	if datasetexists $VOL; then
 		if ismounted $TESTDIR1 $NEWFS_DEFAULT_FS; then
 			log_must umount -f $TESTDIR1
 			sleep 0.1
 		fi
 
-		destroy_dataset $VOL -Rf
+		log_must zfs destroy -Rf $VOL
 	fi
 
 	# Create specified test environment

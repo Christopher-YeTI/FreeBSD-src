@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -23,7 +23,6 @@
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 Martin Matuska. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright (c) 2022 Hewlett Packard Enterprise Development LP.
  */
 
 #include <sys/zfs_context.h>
@@ -42,7 +41,6 @@
 
 #define	ZPROP_INHERIT_SUFFIX "$inherit"
 #define	ZPROP_RECVD_SUFFIX "$recvd"
-#define	ZPROP_IUV_SUFFIX "$iuv"
 
 static int
 dodefault(zfs_prop_t prop, int intsz, int numints, void *buf)
@@ -59,7 +57,7 @@ dodefault(zfs_prop_t prop, int intsz, int numints, void *buf)
 	if (zfs_prop_get_type(prop) == PROP_TYPE_STRING) {
 		if (intsz != 1)
 			return (SET_ERROR(EOVERFLOW));
-		(void) strlcpy(buf, zfs_prop_default_string(prop),
+		(void) strncpy(buf, zfs_prop_default_string(prop),
 		    numints);
 	} else {
 		if (intsz != 8 || numints < 1)
@@ -69,17 +67,6 @@ dodefault(zfs_prop_t prop, int intsz, int numints, void *buf)
 	}
 
 	return (0);
-}
-
-static int
-dsl_prop_known_index(zfs_prop_t prop, uint64_t value)
-{
-	const char *str = NULL;
-	if (prop != ZPROP_CONT && prop != ZPROP_INVAL &&
-	    zfs_prop_get_type(prop) == PROP_TYPE_INDEX)
-		return (!zfs_prop_index_to_string(prop, value, &str));
-
-	return (-1);
 }
 
 int
@@ -94,7 +81,6 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 	boolean_t inheriting = B_FALSE;
 	char *inheritstr;
 	char *recvdstr;
-	char *iuvstr;
 
 	ASSERT(dsl_pool_config_held(dd->dd_pool));
 
@@ -102,10 +88,9 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 		setpoint[0] = '\0';
 
 	prop = zfs_name_to_prop(propname);
-	inheritable = (prop == ZPROP_USERPROP || zfs_prop_inheritable(prop));
+	inheritable = (prop == ZPROP_INVAL || zfs_prop_inheritable(prop));
 	inheritstr = kmem_asprintf("%s%s", propname, ZPROP_INHERIT_SUFFIX);
 	recvdstr = kmem_asprintf("%s%s", propname, ZPROP_RECVD_SUFFIX);
-	iuvstr = kmem_asprintf("%s%s", propname, ZPROP_IUV_SUFFIX);
 
 	/*
 	 * Note: dd may become NULL, therefore we shouldn't dereference it
@@ -118,18 +103,6 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 				break;
 			}
 			inheriting = B_TRUE;
-		}
-
-		/* Check for a iuv value. */
-		err = zap_lookup(mos, dsl_dir_phys(dd)->dd_props_zapobj,
-		    iuvstr, intsz, numints, buf);
-		if (err == 0 && dsl_prop_known_index(prop,
-		    *(uint64_t *)buf) != 1)
-			err = ENOENT;
-		if (err != ENOENT) {
-			if (setpoint != NULL && err == 0)
-				dsl_dir_name(dd, setpoint);
-			break;
 		}
 
 		/* Check for a local value. */
@@ -182,7 +155,6 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 
 	kmem_strfree(inheritstr);
 	kmem_strfree(recvdstr);
-	kmem_strfree(iuvstr);
 
 	return (err);
 }
@@ -196,7 +168,7 @@ dsl_prop_get_ds(dsl_dataset_t *ds, const char *propname,
 	uint64_t zapobj;
 
 	ASSERT(dsl_pool_config_held(ds->ds_dir->dd_pool));
-	inheritable = (prop == ZPROP_USERPROP || zfs_prop_inheritable(prop));
+	inheritable = (prop == ZPROP_INVAL || zfs_prop_inheritable(prop));
 	zapobj = dsl_dataset_phys(ds)->ds_props_obj;
 
 	if (zapobj != 0) {
@@ -532,10 +504,10 @@ dsl_prop_hascb(dsl_dataset_t *ds)
 	return (!list_is_empty(&ds->ds_prop_cbs));
 }
 
+/* ARGSUSED */
 static int
 dsl_prop_notify_all_cb(dsl_pool_t *dp, dsl_dataset_t *ds, void *arg)
 {
-	(void) arg;
 	dsl_dir_t *dd = ds->ds_dir;
 	dsl_prop_record_t *pr;
 	dsl_prop_cb_record_t *cbr;
@@ -662,7 +634,7 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	}
 	mutex_exit(&dd->dd_lock);
 
-	za = zap_attribute_alloc();
+	za = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
 	for (zap_cursor_init(&zc, mos,
 	    dsl_dir_phys(dd)->dd_child_dir_zapobj);
 	    zap_cursor_retrieve(&zc, za) == 0;
@@ -670,52 +642,9 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 		dsl_prop_changed_notify(dp, za->za_first_integer,
 		    propname, value, FALSE);
 	}
-	zap_attribute_free(za);
+	kmem_free(za, sizeof (zap_attribute_t));
 	zap_cursor_fini(&zc);
 	dsl_dir_rele(dd, FTAG);
-}
-
-
-/*
- * For newer values in zfs index type properties, we add a new key
- * propname$iuv (iuv = Ignore Unknown Values) to the properties zap object
- * to store the new property value and store the default value in the
- * existing prop key. So that the propname$iuv key is ignored by the older zfs
- * versions and the default property value from the existing prop key is
- * used.
- */
-static void
-dsl_prop_set_iuv(objset_t *mos, uint64_t zapobj, const char *propname,
-    int intsz, int numints, const void *value, dmu_tx_t *tx)
-{
-	char *iuvstr = kmem_asprintf("%s%s", propname, ZPROP_IUV_SUFFIX);
-	boolean_t iuv = B_FALSE;
-	zfs_prop_t prop = zfs_name_to_prop(propname);
-
-	switch (prop) {
-	case ZFS_PROP_REDUNDANT_METADATA:
-		if (*(uint64_t *)value == ZFS_REDUNDANT_METADATA_SOME ||
-		    *(uint64_t *)value == ZFS_REDUNDANT_METADATA_NONE)
-			iuv = B_TRUE;
-		break;
-	case ZFS_PROP_SNAPDIR:
-		if (*(uint64_t *)value == ZFS_SNAPDIR_DISABLED)
-			iuv = B_TRUE;
-		break;
-	default:
-		break;
-	}
-
-	if (iuv) {
-		VERIFY0(zap_update(mos, zapobj, iuvstr, intsz, numints,
-		    value, tx));
-		uint64_t val = zfs_prop_default_numeric(prop);
-		VERIFY0(zap_update(mos, zapobj, propname, intsz, numints,
-		    &val, tx));
-	} else {
-		zap_remove(mos, zapobj, iuvstr, tx);
-	}
-	kmem_strfree(iuvstr);
 }
 
 void
@@ -730,7 +659,6 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 	const char *valstr = NULL;
 	char *inheritstr;
 	char *recvdstr;
-	char *iuvstr;
 	char *tbuf = NULL;
 	int err;
 	uint64_t version = spa_version(ds->ds_dir->dd_pool->dp_spa);
@@ -764,7 +692,6 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 
 	inheritstr = kmem_asprintf("%s%s", propname, ZPROP_INHERIT_SUFFIX);
 	recvdstr = kmem_asprintf("%s%s", propname, ZPROP_RECVD_SUFFIX);
-	iuvstr = kmem_asprintf("%s%s", propname, ZPROP_IUV_SUFFIX);
 
 	switch ((int)source) {
 	case ZPROP_SRC_NONE:
@@ -782,14 +709,11 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 		/*
 		 * remove propname$inherit
 		 * set propname -> value
-		 * set propname$iuv -> new property value
 		 */
 		err = zap_remove(mos, zapobj, inheritstr, tx);
 		ASSERT(err == 0 || err == ENOENT);
 		VERIFY0(zap_update(mos, zapobj, propname,
 		    intsz, numints, value, tx));
-		(void) dsl_prop_set_iuv(mos, zapobj, propname, intsz,
-		    numints, value, tx);
 		break;
 	case ZPROP_SRC_INHERITED:
 		/*
@@ -798,8 +722,6 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 		 * - set propname$inherit
 		 */
 		err = zap_remove(mos, zapobj, propname, tx);
-		ASSERT(err == 0 || err == ENOENT);
-		err = zap_remove(mos, zapobj, iuvstr, tx);
 		ASSERT(err == 0 || err == ENOENT);
 		if (version >= SPA_VERSION_RECVD_PROPS &&
 		    dsl_prop_get_int_ds(ds, ZPROP_HAS_RECVD, &dummy) == 0) {
@@ -827,7 +749,7 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 		ASSERT(err == 0 || err == ENOENT);
 		err = zap_remove(mos, zapobj, inheritstr, tx);
 		ASSERT(err == 0 || err == ENOENT);
-		zfs_fallthrough;
+		/* FALLTHRU */
 	case (ZPROP_SRC_NONE | ZPROP_SRC_RECEIVED):
 		/*
 		 * remove propname$recvd
@@ -841,7 +763,6 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 
 	kmem_strfree(inheritstr);
 	kmem_strfree(recvdstr);
-	kmem_strfree(iuvstr);
 
 	/*
 	 * If we are left with an empty snap zap we can destroy it.
@@ -960,7 +881,7 @@ dsl_props_set_check(void *arg, dmu_tx_t *tx)
 			return (SET_ERROR(ENAMETOOLONG));
 		}
 		if (nvpair_type(elem) == DATA_TYPE_STRING) {
-			const char *valstr = fnvpair_value_string(elem);
+			char *valstr = fnvpair_value_string(elem);
 			if (strlen(valstr) >= (version <
 			    SPA_VERSION_STMF_PROP ?
 			    ZAP_OLDMAXVALUELEN : ZAP_MAXVALUELEN)) {
@@ -1065,11 +986,11 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
     const char *setpoint, dsl_prop_getflags_t flags, nvlist_t *nv)
 {
 	zap_cursor_t zc;
-	zap_attribute_t *za = zap_attribute_alloc();
+	zap_attribute_t za;
 	int err = 0;
 
 	for (zap_cursor_init(&zc, mos, propobj);
-	    (err = zap_cursor_retrieve(&zc, za)) == 0;
+	    (err = zap_cursor_retrieve(&zc, &za)) == 0;
 	    zap_cursor_advance(&zc)) {
 		nvlist_t *propval;
 		zfs_prop_t prop;
@@ -1079,7 +1000,7 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 		const char *propname;
 		const char *source;
 
-		suffix = strchr(za->za_name, '$');
+		suffix = strchr(za.za_name, '$');
 
 		if (suffix == NULL) {
 			/*
@@ -1089,16 +1010,8 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 			if (flags & DSL_PROP_GET_RECEIVED)
 				continue;
 
-			propname = za->za_name;
+			propname = za.za_name;
 			source = setpoint;
-
-			/* Skip if iuv entries are preset. */
-			valstr = kmem_asprintf("%s%s", propname,
-			    ZPROP_IUV_SUFFIX);
-			err = zap_contains(mos, propobj, valstr);
-			kmem_strfree(valstr);
-			if (err == 0)
-				continue;
 		} else if (strcmp(suffix, ZPROP_INHERIT_SUFFIX) == 0) {
 			/* Skip explicitly inherited entries. */
 			continue;
@@ -1106,8 +1019,8 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 			if (flags & DSL_PROP_GET_LOCAL)
 				continue;
 
-			(void) strlcpy(buf, za->za_name,
-			    MIN(sizeof (buf), suffix - za->za_name + 1));
+			(void) strncpy(buf, za.za_name, (suffix - za.za_name));
+			buf[suffix - za.za_name] = '\0';
 			propname = buf;
 
 			if (!(flags & DSL_PROP_GET_RECEIVED)) {
@@ -1131,16 +1044,6 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 
 			source = ((flags & DSL_PROP_GET_INHERITING) ?
 			    setpoint : ZPROP_SOURCE_VAL_RECVD);
-		} else if (strcmp(suffix, ZPROP_IUV_SUFFIX) == 0) {
-			(void) strlcpy(buf, za->za_name,
-			    MIN(sizeof (buf), suffix - za->za_name + 1));
-			propname = buf;
-			source = setpoint;
-			prop = zfs_name_to_prop(propname);
-
-			if (dsl_prop_known_index(prop,
-			    za->za_first_integer) != 1)
-				continue;
 		} else {
 			/*
 			 * For backward compatibility, skip suffixes we don't
@@ -1152,12 +1055,12 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 		prop = zfs_name_to_prop(propname);
 
 		/* Skip non-inheritable properties. */
-		if ((flags & DSL_PROP_GET_INHERITING) &&
-		    prop != ZPROP_USERPROP && !zfs_prop_inheritable(prop))
+		if ((flags & DSL_PROP_GET_INHERITING) && prop != ZPROP_INVAL &&
+		    !zfs_prop_inheritable(prop))
 			continue;
 
 		/* Skip properties not valid for this type. */
-		if ((flags & DSL_PROP_GET_SNAPSHOT) && prop != ZPROP_USERPROP &&
+		if ((flags & DSL_PROP_GET_SNAPSHOT) && prop != ZPROP_INVAL &&
 		    !zfs_prop_valid_for_type(prop, ZFS_TYPE_SNAPSHOT, B_FALSE))
 			continue;
 
@@ -1166,28 +1069,28 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 			continue;
 
 		VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-		if (za->za_integer_length == 1) {
+		if (za.za_integer_length == 1) {
 			/*
 			 * String property
 			 */
-			char *tmp = kmem_alloc(za->za_num_integers,
+			char *tmp = kmem_alloc(za.za_num_integers,
 			    KM_SLEEP);
 			err = zap_lookup(mos, propobj,
-			    za->za_name, 1, za->za_num_integers, tmp);
+			    za.za_name, 1, za.za_num_integers, tmp);
 			if (err != 0) {
-				kmem_free(tmp, za->za_num_integers);
+				kmem_free(tmp, za.za_num_integers);
 				break;
 			}
 			VERIFY(nvlist_add_string(propval, ZPROP_VALUE,
 			    tmp) == 0);
-			kmem_free(tmp, za->za_num_integers);
+			kmem_free(tmp, za.za_num_integers);
 		} else {
 			/*
 			 * Integer property
 			 */
-			ASSERT(za->za_integer_length == 8);
+			ASSERT(za.za_integer_length == 8);
 			(void) nvlist_add_uint64(propval, ZPROP_VALUE,
-			    za->za_first_integer);
+			    za.za_first_integer);
 		}
 
 		VERIFY(nvlist_add_string(propval, ZPROP_SOURCE, source) == 0);
@@ -1195,7 +1098,6 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 		nvlist_free(propval);
 	}
 	zap_cursor_fini(&zc);
-	zap_attribute_free(za);
 	if (err == ENOENT)
 		err = 0;
 	return (err);

@@ -1,23 +1,20 @@
-zstream_CPPFLAGS = $(AM_CPPFLAGS) $(LIBZPOOL_CPPFLAGS)
+include $(top_srcdir)/config/Rules.am
 
-sbin_PROGRAMS   += zstream
-CPPCHECKTARGETS += zstream
+sbin_PROGRAMS = zstream
 
 zstream_SOURCES = \
-	%D%/zstream.c \
-	%D%/zstream.h \
-	%D%/zstream_decompress.c \
-	%D%/zstream_dump.c \
-	%D%/zstream_recompress.c \
-	%D%/zstream_redup.c \
-	%D%/zstream_token.c
+	zstream.c \
+	zstream.h \
+	zstream_dump.c \
+	zstream_redup.c \
+	zstream_token.c
 
 zstream_LDADD = \
-	libzfs.la \
-	libzfs_core.la \
-	libzpool.la \
-	libnvpair.la
+	$(abs_top_builddir)/lib/libzfs/libzfs.la \
+	$(abs_top_builddir)/lib/libzfs_core/libzfs_core.la \
+	$(abs_top_builddir)/lib/libnvpair/libnvpair.la
 
-PHONY += install-exec-hook
+include $(top_srcdir)/config/CppCheck.am
+
 install-exec-hook:
 	cd $(DESTDIR)$(sbindir) && $(LN_S) -f zstream zstreamdump

@@ -1,5 +1,4 @@
 #!@DEFAULT_INIT_SHELL@
-# shellcheck disable=SC2154
 #
 # zfs-import    This script will import ZFS pools
 #
@@ -58,7 +57,8 @@ find_pools()
 	local pools
 
 	pools=$("$@" 2> /dev/null | \
-		sed -Ee '/pool:|^[a-zA-Z0-9]/!d' -e 's@.*: @@' | \
+		grep -E "pool:|^[a-zA-Z0-9]" | \
+		sed 's@.*: @@' | \
 		sort | \
 		tr '\n' ';')
 
@@ -307,7 +307,7 @@ do_start()
 
 # ----------------------------------------------------
 
-if @IS_SYSV_RC@
+if [ ! -e /sbin/openrc-run ]
 then
 	case "$1" in
 		start)

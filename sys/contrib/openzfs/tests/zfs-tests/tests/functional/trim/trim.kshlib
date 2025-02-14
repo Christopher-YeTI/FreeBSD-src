@@ -22,7 +22,8 @@
 #
 function get_size_mb
 {
-	du --block-size 1048576 -s "$1" | cut -f1
+	typeset rval=$(du --block-size 1048576 -s "$1" | awk '{print $1}')
+	echo -n "$rval"
 }
 
 #
@@ -38,12 +39,14 @@ function get_trim_io
 	# Sum the ind or agg columns of the trim request size histogram.
 	case "$type" in
 	"ind")
-		zpool iostat -pr $pool $vdev |
-		    awk '$1 ~ /[0-9].*/ { sum += $12 } END { print sum }'
+		rval=$(zpool iostat -pr $pool $vdev | awk \
+		    '$1 ~ /[0-9].*/ { sum += $12 } END { print sum }')
+		echo -n "$rval"
 		;;
 	"agg")
-		zpool iostat -pr $pool $vdev |
-		    awk '$1 ~ /[0-9].*/ { sum += $13 } END { print sum }'
+		rval=$(zpool iostat -pr $pool $vdev | awk \
+		    '$1 ~ /[0-9].*/ { sum += $13 } END { print sum }')
+		echo -n "$rval"
 		;;
 	*)
 		log_fail "Type must be 'ind' or 'agg'"
@@ -88,7 +91,7 @@ function wait_trim_io # pool type txgs
 			return
 		fi
 
-		sync_all_pools true
+		zpool sync -f
 		((i = i + 1))
 	done
 

@@ -41,6 +41,7 @@
  * allocations are quickly caught.  These warnings may be disabled by setting
  * the threshold to zero.
  */
+/* BEGIN CSTYLED */
 unsigned int spl_kmem_alloc_warn = MIN(16 * PAGE_SIZE, 64 * 1024);
 module_param(spl_kmem_alloc_warn, uint, 0644);
 MODULE_PARM_DESC(spl_kmem_alloc_warn,
@@ -61,6 +62,7 @@ module_param(spl_kmem_alloc_max, uint, 0644);
 MODULE_PARM_DESC(spl_kmem_alloc_max,
 	"Maximum size in bytes for a kmem_alloc()");
 EXPORT_SYMBOL(spl_kmem_alloc_max);
+/* END CSTYLED */
 
 int
 kmem_debugging(void)
@@ -132,6 +134,7 @@ EXPORT_SYMBOL(kmem_strfree);
 void *
 spl_kvmalloc(size_t size, gfp_t lflags)
 {
+#ifdef HAVE_KVMALLOC
 	/*
 	 * GFP_KERNEL allocations can safely use kvmalloc which may
 	 * improve performance by avoiding a) high latency caused by
@@ -143,6 +146,7 @@ spl_kvmalloc(size_t size, gfp_t lflags)
 	 */
 	if ((lflags & GFP_KERNEL) == GFP_KERNEL)
 		return (kvmalloc(size, lflags));
+#endif
 
 	gfp_t kmalloc_lflags = lflags;
 
@@ -241,21 +245,7 @@ spl_kmem_alloc_impl(size_t size, int flags, int node)
 				return (NULL);
 			}
 		} else {
-			/*
-			 * We use kmalloc when doing kmem_alloc(KM_NOSLEEP),
-			 * because kvmalloc/vmalloc may sleep.  We also use
-			 * kmalloc on systems with limited kernel VA space (e.g.
-			 * 32-bit), which have HIGHMEM.  Otherwise we use
-			 * kvmalloc, which tries to get contiguous physical
-			 * memory (fast, like kmalloc) and falls back on using
-			 * virtual memory to stitch together pages (slow, like
-			 * vmalloc).
-			 */
-#ifdef CONFIG_HIGHMEM
 			if (flags & KM_VMEM) {
-#else
-			if ((flags & KM_VMEM) || !(flags & KM_NOSLEEP)) {
-#endif
 				ptr = spl_kvmalloc(size, lflags);
 			} else {
 				ptr = kmalloc_node(size, lflags, node);

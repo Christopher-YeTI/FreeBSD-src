@@ -36,7 +36,6 @@ static volatile sig_atomic_t _got_hup = 0;
 static void
 _exit_handler(int signum)
 {
-	(void) signum;
 	_got_exit = 1;
 }
 
@@ -46,7 +45,6 @@ _exit_handler(int signum)
 static void
 _hup_handler(int signum)
 {
-	(void) signum;
 	_got_hup = 1;
 }
 
@@ -293,7 +291,7 @@ idle:
 		rv = zed_event_service(&zcp);
 
 		/* ENODEV: When kernel module is unloaded (osx) */
-		if (rv != 0)
+		if (rv == ENODEV)
 			break;
 	}
 

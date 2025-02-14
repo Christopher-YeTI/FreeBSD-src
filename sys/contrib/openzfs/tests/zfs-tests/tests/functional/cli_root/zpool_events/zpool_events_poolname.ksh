@@ -50,8 +50,10 @@ log_must zpool create $NEWPOOL $DISK
 log_must zpool events -c
 
 # 3. Generate some ZFS events on both pools
-for i in {1..$EVENTS_NUM}; do
+for i in `seq 1 $EVENTS_NUM`; do
 	log_must zpool clear $TESTPOOL
+done
+for i in `seq 1 $EVENTS_NUM`; do
 	log_must zpool clear $NEWPOOL
 done
 # wait a bit to allow the kernel module to process new events
@@ -59,11 +61,14 @@ zpool_events_settle
 
 # 4. Verify 'zpool events poolname' successfully display events
 zpool events -v $TESTPOOL |
-   awk -v POOL=$TESTPOOL '/pool = / && $3 != "\""POOL"\"" {exit 1}' ||
+   awk -v POOL=$TESTPOOL '/pool = / {if ($3 != "\""POOL"\"") exit 1}'
+if [[ $? -ne 0 ]]; then
 	log_fail "Unexpected events for pools other than $TESTPOOL"
-
+fi
 zpool events -v $NEWPOOL |
-   awk -v POOL=$NEWPOOL '/pool = / && $3 != "\""POOL"\"" {exit 1}' ||
+   awk -v POOL=$NEWPOOL '/pool = / {if ($3 != "\""POOL"\"") exit 1}'
+if [[ $? -ne 0 ]]; then
 	log_fail "Unexpected events for pools other than $NEWPOOL"
+fi
 
 log_pass "'zpool events poolname' display events only from the chosen pool."

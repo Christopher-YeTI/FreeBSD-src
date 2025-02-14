@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -124,8 +124,8 @@ done
 
 # Foreach test create pool, add -n devices and check output.
 for (( i=0; i < ${#tests[@]}; i+=1 )); do
-	tree="${tests[$i].tree}"
-	want="${tests[$i].want}"
+	typeset tree="${tests[$i].tree}"
+	typeset want="${tests[$i].want}"
 
 	typeset out="$(log_must eval "zpool create -n '$TESTPOOL' $tree" | \
 	    sed /^SUCCESS/d)"

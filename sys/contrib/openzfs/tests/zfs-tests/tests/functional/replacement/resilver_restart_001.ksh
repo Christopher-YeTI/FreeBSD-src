@@ -48,8 +48,6 @@ function cleanup
 	log_must set_tunable32 RESILVER_MIN_TIME_MS $ORIG_RESILVER_MIN_TIME
 	log_must set_tunable32 SCAN_SUSPEND_PROGRESS \
 	    $ORIG_SCAN_SUSPEND_PROGRESS
-	log_must set_tunable32 RESILVER_DEFER_PERCENT \
-	    $ORIG_RESILVER_DEFER_PERCENT
 	log_must set_tunable32 ZEVENT_LEN_MAX $ORIG_ZFS_ZEVENT_LEN_MAX
 	log_must zinject -c all
 	destroy_pool $TESTPOOL1
@@ -92,15 +90,12 @@ log_assert "Check for unnecessary resilver restarts"
 
 ORIG_RESILVER_MIN_TIME=$(get_tunable RESILVER_MIN_TIME_MS)
 ORIG_SCAN_SUSPEND_PROGRESS=$(get_tunable SCAN_SUSPEND_PROGRESS)
-ORIG_RESILVER_DEFER_PERCENT=$(get_tunable RESILVER_DEFER_PERCENT)
 ORIG_ZFS_ZEVENT_LEN_MAX=$(get_tunable ZEVENT_LEN_MAX)
 
 set -A RESTARTS -- '1' '2' '2' '2'
 set -A VDEVS -- '' '' '' ''
 set -A DEFER_RESTARTS -- '1' '1' '1' '2'
 set -A DEFER_VDEVS -- '-' '2' '2' '-'
-set -A EARLY_RESTART_DEFER_RESTARTS -- '1' '2' '2' '2'
-set -A EARLY_RESTART_DEFER_VDEVS -- '' '' '' ''
 
 VDEV_REPLACE="${VDEV_FILES[1]} $SPARE_VDEV_FILE"
 
@@ -130,7 +125,7 @@ done
 wait
 
 # test without and with deferred resilve feature enabled
-for test in "without" "with" "with_early_restart"
+for test in "without" "with"
 do
 	log_note "Testing $test deferred resilvers"
 
@@ -140,13 +135,6 @@ do
 		RESTARTS=( "${DEFER_RESTARTS[@]}" )
 		VDEVS=( "${DEFER_VDEVS[@]}" )
 		VDEV_REPLACE="$SPARE_VDEV_FILE ${VDEV_FILES[1]}"
-		log_must set_tunable32 RESILVER_DEFER_PERCENT 0
-	elif [[ $test == "with_early_restart" ]]
-	then
-		RESTARTS=( "${EARLY_RESTART_DEFER_RESTARTS[@]}" )
-		VDEVS=( "${EARLY_RESTART_DEFER_VDEVS[@]}" )
-		VDEV_REPLACE="${VDEV_FILES[1]} $SPARE_VDEV_FILE"
-		log_must set_tunable32 RESILVER_DEFER_PERCENT 100
 	fi
 
 	# clear the events
@@ -165,16 +153,16 @@ do
 	# offline then online a vdev to introduce a new DTL range after current
 	# scan, which should restart (or defer) the resilver
 	log_must zpool offline $TESTPOOL1 ${VDEV_FILES[2]}
-	sync_pool $TESTPOOL1
+	log_must zpool sync $TESTPOOL1
 	log_must zpool online $TESTPOOL1 ${VDEV_FILES[2]}
-	sync_pool $TESTPOOL1
+	log_must zpool sync $TESTPOOL1
 
 	# there should now be 2 resilver starts w/o defer, 1 with defer
 	verify_restarts ' after offline/online' "${RESTARTS[1]}" "${VDEVS[1]}"
 
 	# inject read io errors on vdev and verify resilver does not restart
 	log_must zinject -a -d ${VDEV_FILES[2]} -e io -T read -f 0.25 $TESTPOOL1
-	log_must cp ${DATAPATHS[1]} /dev/null
+	log_must cat ${DATAPATHS[1]} > /dev/null
 	log_must zinject -c all
 
 	# there should still be 2 resilver starts w/o defer, 1 with defer
@@ -189,8 +177,8 @@ do
 	log_must is_pool_resilvered $TESTPOOL1
 
 	# wait for a few txg's to see if a resilver happens
-	sync_pool $TESTPOOL1
-	sync_pool $TESTPOOL1
+	log_must zpool sync $TESTPOOL1
+	log_must zpool sync $TESTPOOL1
 
 	# there should now be 2 resilver starts
 	verify_restarts ' after resilver' "${RESTARTS[3]}" "${VDEVS[3]}"

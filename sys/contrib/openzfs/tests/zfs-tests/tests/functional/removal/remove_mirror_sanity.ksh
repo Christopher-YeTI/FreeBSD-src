@@ -21,7 +21,9 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-read -r DISK1 DISK2 DISK3 _ <<<"$DISKS"
+DISK1=$(echo $DISKS | awk '{print $1}')
+DISK2=$(echo $DISKS | awk '{print $2}')
+DISK3=$(echo $DISKS | awk '{print $3}')
 DISKS="$DISK1 $DISK2 $DISK3"
 
 log_must default_setup_noexit "$DISK1 mirror $DISK2 $DISK3"

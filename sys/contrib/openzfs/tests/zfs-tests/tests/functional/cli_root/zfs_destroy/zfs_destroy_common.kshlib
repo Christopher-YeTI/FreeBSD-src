@@ -6,7 +6,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -102,7 +102,9 @@ function cleanup_testenv
 
 	pkill mkbusy
 
-	datasetexists $CTR && destroy_dataset $CTR -Rf
+	if datasetexists $CTR; then
+		log_must zfs destroy -Rf $CTR
+	fi
 }
 
 #
@@ -153,7 +155,7 @@ function check_livelist_exists
 function check_livelist_gone
 {
 	log_must zpool wait -t free $TESTPOOL
-	sync_all_pools
+	zpool sync
 	zdb -vvvvv $TESTPOOL | grep "Livelist" && \
 		log_fail "zdb found Livelist after the clone is deleted."
 }

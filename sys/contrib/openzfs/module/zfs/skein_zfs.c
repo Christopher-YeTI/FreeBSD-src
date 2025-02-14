@@ -41,17 +41,18 @@ skein_incremental(void *buf, size_t size, void *arg)
  * function requires the presence of a ctx_template that should be allocated
  * using abd_checksum_skein_tmpl_init.
  */
+/*ARGSUSED*/
 void
 abd_checksum_skein_native(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
-	Skein_512_Ctxt_t ctx;
+	Skein_512_Ctxt_t	ctx;
 
 	ASSERT(ctx_template != NULL);
-	memcpy(&ctx, ctx_template, sizeof (ctx));
+	bcopy(ctx_template, &ctx, sizeof (ctx));
 	(void) abd_iterate_func(abd, 0, size, skein_incremental, &ctx);
 	(void) Skein_512_Final(&ctx, (uint8_t *)zcp);
-	memset(&ctx, 0, sizeof (ctx));
+	bzero(&ctx, sizeof (ctx));
 }
 
 /*
@@ -79,8 +80,9 @@ abd_checksum_skein_byteswap(abd_t *abd, uint64_t size,
 void *
 abd_checksum_skein_tmpl_init(const zio_cksum_salt_t *salt)
 {
-	Skein_512_Ctxt_t *ctx = kmem_zalloc(sizeof (*ctx), KM_SLEEP);
+	Skein_512_Ctxt_t	*ctx;
 
+	ctx = kmem_zalloc(sizeof (*ctx), KM_SLEEP);
 	(void) Skein_512_InitExt(ctx, sizeof (zio_cksum_t) * 8, 0,
 	    salt->zcs_bytes, sizeof (salt->zcs_bytes));
 	return (ctx);
@@ -93,8 +95,8 @@ abd_checksum_skein_tmpl_init(const zio_cksum_salt_t *salt)
 void
 abd_checksum_skein_tmpl_free(void *ctx_template)
 {
-	Skein_512_Ctxt_t *ctx = ctx_template;
+	Skein_512_Ctxt_t	*ctx = ctx_template;
 
-	memset(ctx, 0, sizeof (*ctx));
+	bzero(ctx, sizeof (*ctx));
 	kmem_free(ctx, sizeof (*ctx));
 }

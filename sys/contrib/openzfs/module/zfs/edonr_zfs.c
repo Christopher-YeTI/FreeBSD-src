@@ -45,6 +45,7 @@ edonr_incremental(void *buf, size_t size, void *arg)
 /*
  * Native zio_checksum interface for the Edon-R hash function.
  */
+/*ARGSUSED*/
 void
 abd_checksum_edonr_native(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
@@ -53,10 +54,10 @@ abd_checksum_edonr_native(abd_t *abd, uint64_t size,
 	EdonRState	ctx;
 
 	ASSERT(ctx_template != NULL);
-	memcpy(&ctx, ctx_template, sizeof (ctx));
+	bcopy(ctx_template, &ctx, sizeof (ctx));
 	(void) abd_iterate_func(abd, 0, size, edonr_incremental, &ctx);
 	EdonRFinal(&ctx, digest);
-	memcpy(zcp->zc_word, digest, sizeof (zcp->zc_word));
+	bcopy(digest, zcp->zc_word, sizeof (zcp->zc_word));
 }
 
 /*
@@ -88,17 +89,18 @@ abd_checksum_edonr_tmpl_init(const zio_cksum_salt_t *salt)
 	 * size by double-hashing it (the new salt block will be composed of
 	 * H(salt) || H(H(salt))).
 	 */
-	_Static_assert(EDONR_BLOCK_SIZE == 2 * (EDONR_MODE / 8),
-	    "Edon-R block size mismatch");
-	EdonRHash(salt->zcs_bytes, sizeof (salt->zcs_bytes) * 8, salt_block);
-	EdonRHash(salt_block, EDONR_MODE, salt_block + EDONR_MODE / 8);
+	CTASSERT(EDONR_BLOCK_SIZE == 2 * (EDONR_MODE / 8));
+	EdonRHash(EDONR_MODE, salt->zcs_bytes, sizeof (salt->zcs_bytes) * 8,
+	    salt_block);
+	EdonRHash(EDONR_MODE, salt_block, EDONR_MODE, salt_block +
+	    EDONR_MODE / 8);
 
 	/*
 	 * Feed the new salt block into the hash function - this will serve
 	 * as our MAC key.
 	 */
 	ctx = kmem_zalloc(sizeof (*ctx), KM_SLEEP);
-	EdonRInit(ctx);
+	EdonRInit(ctx, EDONR_MODE);
 	EdonRUpdate(ctx, salt_block, sizeof (salt_block) * 8);
 	return (ctx);
 }
@@ -106,8 +108,8 @@ abd_checksum_edonr_tmpl_init(const zio_cksum_salt_t *salt)
 void
 abd_checksum_edonr_tmpl_free(void *ctx_template)
 {
-	EdonRState *ctx = ctx_template;
+	EdonRState	*ctx = ctx_template;
 
-	memset(ctx, 0, sizeof (*ctx));
+	bzero(ctx, sizeof (*ctx));
 	kmem_free(ctx, sizeof (*ctx));
 }

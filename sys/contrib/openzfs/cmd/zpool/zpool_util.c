@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -28,7 +28,7 @@
 #include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <ctype.h>
 
 #include "zpool_util.h"
@@ -42,22 +42,6 @@ safe_malloc(size_t size)
 	void *data;
 
 	if ((data = calloc(1, size)) == NULL) {
-		(void) fprintf(stderr, "internal error: out of memory\n");
-		exit(1);
-	}
-
-	return (data);
-}
-
-/*
- * Utility function to guarantee realloc() success.
- */
-void *
-safe_realloc(void *from, size_t size)
-{
-	void *data;
-
-	if ((data = realloc(from, size)) == NULL) {
 		(void) fprintf(stderr, "internal error: out of memory\n");
 		exit(1);
 	}

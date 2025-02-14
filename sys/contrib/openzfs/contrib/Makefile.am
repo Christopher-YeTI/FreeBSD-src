@@ -1,14 +1,12 @@
-include $(srcdir)/%D%/bash_completion.d/Makefile.am
-include $(srcdir)/%D%/debian/Makefile.am
-include $(srcdir)/%D%/pyzfs/Makefile.am
-include $(srcdir)/%D%/zcp/Makefile.am
+include $(top_srcdir)/config/Shellcheck.am
 
+SUBDIRS = bash_completion.d pyzfs zcp
 if BUILD_LINUX
-include $(srcdir)/%D%/bpftrace/Makefile.am
-include $(srcdir)/%D%/dracut/Makefile.am
-include $(srcdir)/%D%/initramfs/Makefile.am
+SUBDIRS += bpftrace dracut initramfs
 endif
-
 if PAM_ZFS_ENABLED
-include $(srcdir)/%D%/pam_zfs_key/Makefile.am
+SUBDIRS += pam_zfs_key
 endif
+DIST_SUBDIRS = bash_completion.d bpftrace dracut initramfs pam_zfs_key pyzfs zcp
+
+SHELLCHECKDIRS = bash_completion.d bpftrace dracut initramfs

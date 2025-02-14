@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -58,12 +58,16 @@ function cleanup
 		safe_dumpadm $savedumpdev
 	fi
 
-	swap -l | grep -qw $voldev && log_must swap -d $voldev
+	swap -l | grep -w $voldev > /dev/null 2>&1
+        if (( $? == 0 ));  then
+		log_must swap -d $voldev
+	fi
 
 	typeset snap
 	for snap in snap0 snap1 ; do
-		datasetexists $TESTPOOL/$TESTVOL@$snap && \
-			 destroy_dataset $TESTPOOL/$TESTVOL@$snap
+		if datasetexists $TESTPOOL/$TESTVOL@$snap ; then
+			log_must zfs destroy $TESTPOOL/$TESTVOL@$snap
+		fi
 	done
 	zfs set volsize=$volsize $TESTPOOL/$TESTVOL
 }

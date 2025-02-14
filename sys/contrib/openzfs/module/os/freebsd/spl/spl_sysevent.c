@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -111,7 +114,7 @@ log_sysevent(nvlist_t *event)
 		}
 		case DATA_TYPE_STRING:
 		{
-			const char *value;
+			char *value;
 
 			(void) nvpair_value_string(elem, &value);
 			sbuf_printf(sb, " %s=%s", nvpair_name(elem), value);
@@ -177,7 +180,7 @@ log_sysevent(nvlist_t *event)
 		}
 		case DATA_TYPE_STRING_ARRAY:
 		{
-			const char **strarr;
+			char **strarr;
 			uint_t ii, nelem;
 
 			(void) nvpair_value_string_array(elem, &strarr, &nelem);
@@ -242,22 +245,12 @@ sysevent_worker(void *arg __unused)
 			if (error == ESHUTDOWN)
 				break;
 		} else {
-			VERIFY3P(event, !=, NULL);
+			VERIFY(event != NULL);
 			log_sysevent(event);
 			nvlist_free(event);
 		}
 	}
-
-	/*
-	 * We avoid zfs_zevent_destroy() here because we're otherwise racing
-	 * against fm_fini() destroying the zevent_lock.  zfs_zevent_destroy()
-	 * will currently only clear `ze->ze_zevent` from an event list then
-	 * free `ze`, so just inline the free() here -- events have already
-	 * been drained.
-	 */
-	VERIFY3P(ze->ze_zevent, ==, NULL);
-	kmem_free(ze, sizeof (zfs_zevent_t));
-
+	zfs_zevent_destroy(ze);
 	kthread_exit();
 }
 

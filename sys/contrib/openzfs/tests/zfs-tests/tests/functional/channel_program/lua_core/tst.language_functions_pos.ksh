@@ -33,7 +33,9 @@ log_assert "Simple lua scripts pass."
 
 typeset -i i=0
 while (( i < ${#args[*]} )); do
-	log_must_program $TESTPOOL - <<<"${args[i]}"
+	log_must_program $TESTPOOL - <<-EOF
+		${args[i]}
+	EOF
 	((i = i + 1))
 done
 

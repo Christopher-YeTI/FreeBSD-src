@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -46,12 +46,15 @@ function cleanup
 {
 	unset ZFS_ABORT
 
-	log_must pop_coredump_pattern "$coresavepath"
-	log_must rm -rf $corepath
+	if is_freebsd && [ -n "$old_corefile" ]; then
+		sysctl kern.corefile=$old_corefile
+	fi
+
+	rm -rf $corepath
 
 	# Don't leave the pool frozen.
-	log_must destroy_pool $TESTPOOL
-	log_must default_mirror_setup $DISKS
+	destroy_pool $TESTPOOL
+	default_mirror_setup $DISKS
 }
 
 verify_runnable "both"
@@ -60,14 +63,15 @@ log_assert "Debugging features of zpool should succeed."
 log_onexit cleanup
 
 corepath=$TESTDIR/core
-corefile=$corepath/core.zpool
-coresavepath=$corepath/save
-log_must rm -rf $corepath
+corefile=$corepath/zpool.core
+if [[ -d $corepath ]]; then
+	log_must rm -rf $corepath
+fi
 log_must mkdir $corepath
 
 log_must eval "zpool -? >/dev/null 2>&1"
 
-if is_global_zone; then
+if is_global_zone ; then
 	log_must zpool freeze $TESTPOOL
 else
 	log_mustnot zpool freeze $TESTPOOL
@@ -76,10 +80,22 @@ fi
 
 log_mustnot zpool freeze fakepool
 
-log_must eval "push_coredump_pattern \"$corepath\" > \"$coresavepath\""
-log_must export ZFS_ABORT=yes
+if is_linux; then
+	echo $corefile >/proc/sys/kernel/core_pattern
+	echo 0 >/proc/sys/kernel/core_uses_pid
+elif is_freebsd; then
+	old_corefile=$(sysctl -n kern.corefile)
+	log_must sysctl kern.corefile=$corefile
+fi
+ulimit -c unlimited
 
-log_mustnot eval "zpool >/dev/null 2>&1"
-log_must [ -f "$corefile" ]
+export ASAN_OPTIONS="abort_on_error=1:disable_coredump=0"
+export ZFS_ABORT=yes
+
+zpool >/dev/null 2>&1
+
+unset ZFS_ABORT
+
+[[ -f $corefile ]] || log_fail "zpool did not dump core by request."
 
 log_pass "Debugging features of zpool succeed."

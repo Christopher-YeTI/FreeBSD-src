@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -56,7 +56,7 @@
  * in include/libzfs.h.  Note that there are some status results which go past
  * the end of this table, and hence have no associated message ID.
  */
-static const char *const zfs_msgid_table[] = {
+static char *zfs_msgid_table[] = {
 	"ZFS-8000-14", /* ZPOOL_STATUS_CORRUPT_CACHE */
 	"ZFS-8000-2Q", /* ZPOOL_STATUS_MISSING_DEV_R */
 	"ZFS-8000-3C", /* ZPOOL_STATUS_MISSING_DEV_NR */
@@ -96,48 +96,48 @@ static const char *const zfs_msgid_table[] = {
 
 #define	NMSGID	(sizeof (zfs_msgid_table) / sizeof (zfs_msgid_table[0]))
 
+/* ARGSUSED */
 static int
 vdev_missing(vdev_stat_t *vs, uint_t vsc)
 {
-	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_CANT_OPEN &&
 	    vs->vs_aux == VDEV_AUX_OPEN_FAILED);
 }
 
+/* ARGSUSED */
 static int
 vdev_faulted(vdev_stat_t *vs, uint_t vsc)
 {
-	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_FAULTED);
 }
 
+/* ARGSUSED */
 static int
 vdev_errors(vdev_stat_t *vs, uint_t vsc)
 {
-	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_DEGRADED ||
 	    vs->vs_read_errors != 0 || vs->vs_write_errors != 0 ||
 	    vs->vs_checksum_errors != 0);
 }
 
+/* ARGSUSED */
 static int
 vdev_broken(vdev_stat_t *vs, uint_t vsc)
 {
-	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_CANT_OPEN);
 }
 
+/* ARGSUSED */
 static int
 vdev_offlined(vdev_stat_t *vs, uint_t vsc)
 {
-	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_OFFLINE);
 }
 
+/* ARGSUSED */
 static int
 vdev_removed(vdev_stat_t *vs, uint_t vsc)
 {
-	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_REMOVED);
 }
 
@@ -159,7 +159,8 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
     boolean_t ignore_replacing)
 {
 	nvlist_t **child;
-	uint_t c, children;
+	vdev_stat_t *vs;
+	uint_t c, vsc, children;
 
 	/*
 	 * Ignore problems within a 'replacing' vdev, since we're presumably in
@@ -168,8 +169,10 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
 	 * later.
 	 */
 	if (ignore_replacing == B_TRUE) {
-		const char *type = fnvlist_lookup_string(vdev,
-		    ZPOOL_CONFIG_TYPE);
+		char *type;
+
+		verify(nvlist_lookup_string(vdev, ZPOOL_CONFIG_TYPE,
+		    &type) == 0);
 		if (strcmp(type, VDEV_TYPE_REPLACING) == 0)
 			return (B_FALSE);
 	}
@@ -180,9 +183,9 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
 			if (find_vdev_problem(child[c], func, ignore_replacing))
 				return (B_TRUE);
 	} else {
-		uint_t vsc;
-		vdev_stat_t *vs = (vdev_stat_t *)fnvlist_lookup_uint64_array(
-		    vdev, ZPOOL_CONFIG_VDEV_STATS, &vsc);
+		verify(nvlist_lookup_uint64_array(vdev, ZPOOL_CONFIG_VDEV_STATS,
+		    (uint64_t **)&vs, &vsc) == 0);
+
 		if (func(vs, vsc) != 0)
 			return (B_TRUE);
 	}
@@ -221,20 +224,26 @@ static zpool_status_t
 check_status(nvlist_t *config, boolean_t isimport,
     zpool_errata_t *erratap, const char *compat)
 {
+	nvlist_t *nvroot;
+	vdev_stat_t *vs;
 	pool_scan_stat_t *ps = NULL;
 	uint_t vsc, psc;
+	uint64_t nerr;
+	uint64_t version;
+	uint64_t stateval;
 	uint64_t suspended;
 	uint64_t hostid = 0;
 	uint64_t errata = 0;
 	unsigned long system_hostid = get_system_hostid();
 
-	uint64_t version = fnvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION);
-	nvlist_t *nvroot = fnvlist_lookup_nvlist(config,
-	    ZPOOL_CONFIG_VDEV_TREE);
-	vdev_stat_t *vs = (vdev_stat_t *)fnvlist_lookup_uint64_array(nvroot,
-	    ZPOOL_CONFIG_VDEV_STATS, &vsc);
-	uint64_t stateval = fnvlist_lookup_uint64(config,
-	    ZPOOL_CONFIG_POOL_STATE);
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
+	    &version) == 0);
+	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_VDEV_STATS,
+	    (uint64_t **)&vs, &vsc) == 0);
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
+	    &stateval) == 0);
 
 	/*
 	 * Currently resilvering a vdev
@@ -328,8 +337,10 @@ check_status(nvlist_t *config, boolean_t isimport,
 	 */
 	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
 	    vs->vs_aux == VDEV_AUX_UNSUP_FEAT) {
-		nvlist_t *nvinfo = fnvlist_lookup_nvlist(config,
-		    ZPOOL_CONFIG_LOAD_INFO);
+		nvlist_t *nvinfo;
+
+		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_LOAD_INFO,
+		    &nvinfo) == 0);
 		if (nvlist_exists(nvinfo, ZPOOL_CONFIG_CAN_RDONLY))
 			return (ZPOOL_STATUS_UNSUP_FEAT_WRITE);
 		return (ZPOOL_STATUS_UNSUP_FEAT_READ);
@@ -392,7 +403,6 @@ check_status(nvlist_t *config, boolean_t isimport,
 	 * Persistent data errors.
 	 */
 	if (!isimport) {
-		uint64_t nerr;
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRCOUNT,
 		    &nerr) == 0 && nerr != 0)
 			return (ZPOOL_STATUS_CORRUPT_DATA);
@@ -496,8 +506,7 @@ check_status(nvlist_t *config, boolean_t isimport,
 }
 
 zpool_status_t
-zpool_get_status(zpool_handle_t *zhp, const char **msgid,
-    zpool_errata_t *errata)
+zpool_get_status(zpool_handle_t *zhp, char **msgid, zpool_errata_t *errata)
 {
 	/*
 	 * pass in the desired feature set, as
@@ -521,8 +530,7 @@ zpool_get_status(zpool_handle_t *zhp, const char **msgid,
 }
 
 zpool_status_t
-zpool_import_status(nvlist_t *config, const char **msgid,
-    zpool_errata_t *errata)
+zpool_import_status(nvlist_t *config, char **msgid, zpool_errata_t *errata)
 {
 	zpool_status_t ret = check_status(config, B_TRUE, errata, NULL);
 

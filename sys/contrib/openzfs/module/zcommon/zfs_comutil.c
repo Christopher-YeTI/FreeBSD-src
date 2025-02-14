@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -68,9 +68,9 @@ zfs_allocatable_devs(nvlist_t *nv)
  * Are there special vdevs?
  */
 boolean_t
-zfs_special_devs(nvlist_t *nv, const char *type)
+zfs_special_devs(nvlist_t *nv, char *type)
 {
-	const char *bias;
+	char *bias;
 	uint_t c;
 	nvlist_t **child;
 	uint_t children;
@@ -84,9 +84,11 @@ zfs_special_devs(nvlist_t *nv, const char *type)
 		    &bias) == 0) {
 			if (strcmp(bias, VDEV_ALLOC_BIAS_SPECIAL) == 0 ||
 			    strcmp(bias, VDEV_ALLOC_BIAS_DEDUP) == 0) {
-				if (type == NULL ||
-				    (type != NULL && strcmp(bias, type) == 0))
+				if (type != NULL && strcmp(bias, type) == 0) {
 					return (B_TRUE);
+				} else if (type == NULL) {
+					return (B_TRUE);
+				}
 			}
 		}
 	}
@@ -98,7 +100,7 @@ zpool_get_load_policy(nvlist_t *nvl, zpool_load_policy_t *zlpp)
 {
 	nvlist_t *policy;
 	nvpair_t *elem;
-	const char *nm;
+	char *nm;
 
 	/* Defaults */
 	zlpp->zlp_rewind = ZPOOL_NO_REWIND;
@@ -156,11 +158,13 @@ static zfs_version_spa_map_t zfs_version_table[] = {
 int
 zfs_zpl_version_map(int spa_version)
 {
+	int i;
 	int version = -1;
 
-	for (int i = 0; zfs_version_table[i].version_spa; i++)
+	for (i = 0; zfs_version_table[i].version_spa; i++) {
 		if (spa_version >= zfs_version_table[i].version_spa)
 			version = zfs_version_table[i].version_zpl;
+	}
 
 	return (version);
 }
@@ -172,18 +176,22 @@ zfs_zpl_version_map(int spa_version)
 int
 zfs_spa_version_map(int zpl_version)
 {
-	for (int i = 0; zfs_version_table[i].version_zpl; i++)
+	int i;
+	int version = -1;
+
+	for (i = 0; zfs_version_table[i].version_zpl; i++) {
 		if (zfs_version_table[i].version_zpl >= zpl_version)
 			return (zfs_version_table[i].version_spa);
+	}
 
-	return (-1);
+	return (version);
 }
 
 /*
  * This is the table of legacy internal event names; it should not be modified.
  * The internal events are now stored in the history log as strings.
  */
-const char *const zfs_history_event_names[ZFS_NUM_LEGACY_HISTORY_EVENTS] = {
+const char *zfs_history_event_names[ZFS_NUM_LEGACY_HISTORY_EVENTS] = {
 	"invalid event",
 	"pool create",
 	"vdev add",
@@ -235,7 +243,9 @@ zfs_dataset_name_hidden(const char *name)
 	 * internal datasets (which have a $ in their name), and
 	 * temporary datasets (which have a % in their name).
 	 */
-	if (strpbrk(name, "$%") != NULL)
+	if (strchr(name, '$') != NULL)
+		return (B_TRUE);
+	if (strchr(name, '%') != NULL)
 		return (B_TRUE);
 	if (!INGLOBALZONE(curproc) && !zone_dataset_visible(name, NULL))
 		return (B_TRUE);

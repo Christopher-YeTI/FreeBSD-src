@@ -31,7 +31,9 @@ verify_runnable "both"
 function cleanup
 {
 	for snap in $TESTSNAP1 $TESTSNAP2; do
-		snapexists "$snap" && destroy_dataset "$snap"
+		if snapexists "$snap"; then
+			log_must zfs destroy "$snap"
+		fi
 	done
 	find "$MNTPOINT" -type f -delete
 	rm -f "$FILEDIFF"
@@ -73,8 +75,10 @@ log_must zfs snapshot "$TESTSNAP2"
 # 3. Verify 'zfs diff -t' correctly display timestamps
 typeset -i count=0
 log_must eval "zfs diff -t $TESTSNAP1 $TESTSNAP2 > $FILEDIFF"
-awk '{print substr($1,1,index($1,".")-1) " " $NF}' "$FILEDIFF" | while read -r ctime file
+awk '{print substr($1,1,index($1,".")-1)" "$NF}' < "$FILEDIFF" | while read line
 do
+	read ctime file <<< "$line"
+
 	# If path from 'zfs diff' is not a file (could be xattr object) skip it
 	if [[ ! -f "$file" ]]; then
 		continue;

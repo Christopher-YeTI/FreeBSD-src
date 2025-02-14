@@ -1,52 +1,45 @@
-include $(srcdir)/%D%/include/Makefile.am
+include $(top_srcdir)/config/Rules.am
 
-libspl_assert_la_CFLAGS = $(AM_CFLAGS) $(LIBRARY_CFLAGS) $(LIBUNWIND_CFLAGS)
-libspl_la_CFLAGS        = $(libspl_assert_la_CFLAGS)
+SUBDIRS = include
 
-noinst_LTLIBRARIES += libspl_assert.la libspl.la
-CPPCHECKTARGETS    += libspl_assert.la libspl.la
+noinst_LTLIBRARIES = libspl_assert.la libspl.la
 
 libspl_assert_la_SOURCES = \
-	%D%/assert.c \
-	%D%/backtrace.c
+	assert.c
 
-libspl_la_SOURCES = \
-	%D%/libspl_impl.h \
-	%D%/atomic.c \
-	%D%/getexecname.c \
-	%D%/list.c \
-	%D%/mkdirp.c \
-	%D%/page.c \
-	%D%/strlcat.c \
-	%D%/strlcpy.c \
-	%D%/timestamp.c \
-	%D%/include/sys/list.h \
-	%D%/include/sys/list_impl.h
+USER_C = \
+	atomic.c \
+	list.c \
+	mkdirp.c \
+	page.c \
+	strlcat.c \
+	strlcpy.c \
+	timestamp.c \
+	include/sys/list.h \
+	include/sys/list_impl.h
 
 if BUILD_LINUX
-libspl_la_SOURCES += \
-	%D%/os/linux/getexecname.c \
-	%D%/os/linux/gethostid.c \
-	%D%/os/linux/getmntany.c \
-	%D%/os/linux/zone.c
+USER_C += \
+	os/linux/getexecname.c \
+	os/linux/gethostid.c \
+	os/linux/getmntany.c \
+	os/linux/zone.c
 endif
 
 if BUILD_FREEBSD
-libspl_la_SOURCES += \
-	%D%/os/freebsd/getexecname.c \
-	%D%/os/freebsd/gethostid.c \
-	%D%/os/freebsd/getmntany.c \
-	%D%/os/freebsd/mnttab.c \
-	%D%/os/freebsd/zone.c
+USER_C += \
+	os/freebsd/getexecname.c \
+	os/freebsd/gethostid.c \
+	os/freebsd/getmntany.c \
+	os/freebsd/mnttab.c \
+	os/freebsd/zone.c
 endif
+
+libspl_la_SOURCES = $(USER_C)
 
 libspl_la_LIBADD = \
 	libspl_assert.la
 
 libspl_la_LIBADD += $(LIBATOMIC_LIBS) $(LIBCLOCK_GETTIME)
 
-libspl_assert_la_LIBADD = $(BACKTRACE_LIBS) $(LIBUNWIND_LIBS)
-
-if BUILD_FREEBSD
-libspl_assert_la_LIBADD += -lpthread
-endif
+include $(top_srcdir)/config/CppCheck.am

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -23,13 +23,11 @@
  * Copyright (c) 2017, Intle Corporation. All rights reserved.
  */
 
-
-
 #include <errno.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
@@ -209,6 +207,7 @@ static int
 zfs_project_handle_dir(const char *name, zfs_project_control_t *zpc,
     list_t *head)
 {
+	char fullname[PATH_MAX];
 	struct dirent *ent;
 	DIR *dir;
 	int ret = 0;
@@ -228,28 +227,21 @@ zfs_project_handle_dir(const char *name, zfs_project_control_t *zpc,
 	zpc->zpc_ignore_noent = B_TRUE;
 	errno = 0;
 	while (!ret && (ent = readdir(dir)) != NULL) {
-		char *fullname;
-
 		/* skip "." and ".." */
 		if (strcmp(ent->d_name, ".") == 0 ||
 		    strcmp(ent->d_name, "..") == 0)
 			continue;
 
-		if (strlen(ent->d_name) + strlen(name) + 1 >= PATH_MAX) {
+		if (strlen(ent->d_name) + strlen(name) >=
+		    sizeof (fullname) + 1) {
 			errno = ENAMETOOLONG;
 			break;
 		}
 
-		if (asprintf(&fullname, "%s/%s", name, ent->d_name) == -1) {
-			errno = ENOMEM;
-			break;
-		}
-
+		sprintf(fullname, "%s/%s", name, ent->d_name);
 		ret = zfs_project_handle_one(fullname, zpc);
 		if (!ret && zpc->zpc_recursive && ent->d_type == DT_DIR)
 			zfs_project_item_alloc(head, fullname);
-
-		free(fullname);
 	}
 
 	if (errno && !ret) {

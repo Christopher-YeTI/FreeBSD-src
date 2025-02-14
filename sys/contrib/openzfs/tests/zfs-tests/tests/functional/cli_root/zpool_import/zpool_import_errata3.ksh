@@ -44,15 +44,17 @@ POOL_FILE=cryptv0.dat
 function uncompress_pool
 {
 	log_note "Creating pool from $POOL_FILE"
-	log_must eval bzcat \
+	log_must bzcat \
 	    $STF_SUITE/tests/functional/cli_root/zpool_import/blockfiles/$POOL_FILE.bz2 \
-	    "> /$TESTPOOL/$POOL_FILE"
+	    > /$TESTPOOL/$POOL_FILE
+	return 0
 }
 
 function cleanup
 {
 	poolexists $POOL_NAME && log_must zpool destroy $POOL_NAME
-	log_must rm -f /$TESTPOOL/$POOL_FILE
+	[[ -e /$TESTPOOL/$POOL_FILE ]] && rm /$TESTPOOL/$POOL_FILE
+	return 0
 }
 log_onexit cleanup
 
@@ -70,7 +72,7 @@ log_must zfs mount -o ro $POOL_NAME/testfs
 
 old_mntpnt=$(get_prop mountpoint $POOL_NAME/testfs)
 log_must eval "ls $old_mntpnt | grep -q testfile"
-block_device_wait /dev/zvol/$POOL_NAME/testvol
+block_device_wait
 log_mustnot dd if=/dev/zero of=/dev/zvol/$POOL_NAME/testvol bs=512 count=1
 log_must dd if=/dev/zvol/$POOL_NAME/testvol of=/dev/null bs=512 count=1
 
@@ -88,7 +90,7 @@ log_must eval "zfs send $POOL_NAME/testfs@snap1 | \
 	zfs recv $POOL_NAME/encroot/testfs"
 log_must eval "zfs send $POOL_NAME/testvol@snap1 | \
 	zfs recv $POOL_NAME/encroot/testvol"
-block_device_wait /dev/zvol/$POOL_NAME/encroot/testvol
+block_device_wait
 log_must dd if=/dev/zero of=/dev/zvol/$POOL_NAME/encroot/testvol bs=512 count=1
 new_mntpnt=$(get_prop mountpoint $POOL_NAME/encroot/testfs)
 log_must eval "ls $new_mntpnt | grep -q testfile"

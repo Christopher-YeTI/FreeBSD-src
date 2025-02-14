@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -55,8 +55,9 @@ log_onexit cleanup
 log_must zfs set atime=on $TESTPOOL/$TESTFS
 log_must zfs mount -o remount,noatime $TESTPOOL/$TESTFS
 
-read -r _ _ value1 _ < <(zfs get -H atime $TESTPOOL/$TESTFS)
-read -r _ value2 < <(zfs get -H all $TESTPOOL/$TESTFS | cut -f2,3 | grep ^atime)
+value1=$(zfs get -H atime $TESTPOOL/$TESTFS | awk '{print $3}')
+value2=$(zfs get -H all $TESTPOOL/$TESTFS | awk '{print $2 " " $3}' | \
+	grep ^atime | awk '{print $2}')
 if [[ $value1 != $value2 ]]; then
 	log_fail "value1($value1) != value2($value2)"
 fi

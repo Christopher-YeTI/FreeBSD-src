@@ -53,6 +53,7 @@
  */
 
 
+#include <linux/percpu_compat.h>
 #include <sys/kmem.h>
 #include <sys/kmem_cache.h>
 #include <sys/zmod.h>
@@ -201,9 +202,9 @@ spl_zlib_init(void)
 	zlib_workspace_cache = kmem_cache_create(
 	    "spl_zlib_workspace_cache",
 	    size, 0, NULL, NULL, NULL, NULL, NULL,
-	    KMC_KVMEM | KMC_RECLAIMABLE);
+	    KMC_KVMEM);
 	if (!zlib_workspace_cache)
-		return (-ENOMEM);
+		return (1);
 
 	return (0);
 }

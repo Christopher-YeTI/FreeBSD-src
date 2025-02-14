@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -49,11 +49,15 @@ function cleanup
 {
 	cd $olddir
 
-	datasetexists $clone && destroy_dataset $clone -f
-	snapexists $snap && destroy_dataset $snap -f
+	datasetexists $clone && \
+		log_must zfs destroy -f $clone
+
+	snapexists $snap && \
+		log_must zfs destroy -f $snap
 
 	for fs in $fs1 $fs2; do
-		datasetexists $fs && destroy_dataset $fs -f
+		datasetexists $fs && \
+			log_must zfs destroy -f $fs
 	done
 
 	for dir in $TESTDIR1 $TESTDIR2; do
@@ -98,7 +102,8 @@ log_must zfs set mountpoint=$mntp1 $fs1
 log_must zfs set mountpoint=$mntp2 $clone
 
 for arg in "$fs1 $mntp1" "$clone $mntp2"; do
-	read -r fs mntp <<<"$arg"
+	fs=`echo $arg | awk '{print $1}'`
+	mntp=`echo $arg | awk '{print $2}'`
 
 	log_note "Verify that 'zfs destroy' fails to" \
 			"destroy filesystem when it is busy."

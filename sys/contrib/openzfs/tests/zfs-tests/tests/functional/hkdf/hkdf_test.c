@@ -18,10 +18,12 @@
  */
 
 #include <stdio.h>
-#include <string.h>
+#include <strings.h>
 #include <sys/crypto/icp.h>
 #include <sys/sha2.h>
 #include <sys/hkdf.h>
+
+#define	NELEMS(x)  (sizeof (x) / sizeof ((x)[0]))
 
 /*
  * Byte arrays are given as char pointers so that they
@@ -29,16 +31,16 @@
  */
 typedef struct hkdf_tv {
 	/* test vector input values */
-	const char		*ikm;
+	char		*ikm;
 	uint_t		ikm_len;
-	const char		*salt;
+	char		*salt;
 	uint_t		salt_len;
-	const char		*info;
+	char		*info;
 	uint_t		info_len;
 	uint_t		okm_len;
 
 	/* expected output */
-	const char		*okm;
+	char		*okm;
 } hkdf_tv_t;
 
 /*
@@ -48,7 +50,7 @@ typedef struct hkdf_tv {
  * The current vectors were taken from:
  * https://www.kullo.net/blog/hkdf-sha-512-test-vectors/
  */
-static const hkdf_tv_t test_vectors[] = {
+static hkdf_tv_t test_vectors[] = {
 	{
 		.ikm =	"\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b"
 			"\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b"
@@ -170,33 +172,36 @@ static const hkdf_tv_t test_vectors[] = {
 };
 
 static void
-hexdump(const char *str, uint8_t *src, uint_t len)
+hexdump(char *str, uint8_t *src, uint_t len)
 {
+	int i;
+
 	printf("\t%s\t", str);
-	for (int i = 0; i < len; i++)
-		printf("%02hhx", src[i]);
+	for (i = 0; i < len; i++) {
+		printf("%02x", src[i] & 0xff);
+	}
 	printf("\n");
 }
 
 static int
-run_test(int i, const hkdf_tv_t *tv)
+run_test(int i, hkdf_tv_t *tv)
 {
 	int ret;
-	uint8_t good[SHA512_DIGEST_LENGTH];
+	uint8_t okey[SHA512_DIGEST_LENGTH];
 
 	printf("TEST %d:\t", i);
 
 	ret = hkdf_sha512((uint8_t *)tv->ikm, tv->ikm_len, (uint8_t *)tv->salt,
-	    tv->salt_len, (uint8_t *)tv->info, tv->info_len, good, tv->okm_len);
+	    tv->salt_len, (uint8_t *)tv->info, tv->info_len, okey, tv->okm_len);
 	if (ret != 0) {
 		printf("HKDF failed with error code %d\n", ret);
 		return (ret);
 	}
 
-	if (memcmp(good, tv->okm, tv->okm_len) != 0) {
+	if (bcmp(okey, tv->okm, tv->okm_len) != 0) {
 		printf("Output Mismatch\n");
 		hexdump("Expected:", (uint8_t *)tv->okm, tv->okm_len);
-		hexdump("Actual:  ", good, tv->okm_len);
+		hexdump("Actual:  ", okey, tv->okm_len);
 		return (1);
 	}
 
@@ -206,13 +211,13 @@ run_test(int i, const hkdf_tv_t *tv)
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
 	int ret, i;
 
 	icp_init();
 
-	for (i = 0; i < ARRAY_SIZE(test_vectors); i++) {
+	for (i = 0; i < NELEMS(test_vectors); i++) {
 		ret = run_test(i, &test_vectors[i]);
 		if (ret != 0)
 			break;

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -34,25 +34,13 @@
 
 verify_runnable "global"
 
-#
-# Determine whether this version of the ksh being
-# executed has a bug where the limit of background
-# processes of 25.
-#
-(
-	pids=
-	for _ in $(seq 50); do
-		: &
-		pids="$pids $!"
-	done
-
-	for pid in $pids; do
-		wait $pid || exit
-	done
-) || {
+check_bg_procs_limit_num
+if [[ $? -ne 0 ]]; then
 	log_note "ksh background process limit number is 25"
-	GANGPIDS=25
-}
+	export GANGPIDS=25
+fi
+
+export PIDS=""
 
 init_setup $DISK
 

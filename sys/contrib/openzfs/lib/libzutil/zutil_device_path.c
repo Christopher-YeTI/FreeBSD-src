@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -31,22 +31,6 @@
 
 #include <libzutil.h>
 
-/* Substring from after the last slash, or the string itself if none */
-const char *
-zfs_basename(const char *path)
-{
-	const char *bn = strrchr(path, '/');
-	return (bn ? bn + 1 : path);
-}
-
-/* Return index of last slash or -1 if none */
-ssize_t
-zfs_dirnamelen(const char *path)
-{
-	const char *end = strrchr(path, '/');
-	return (end ? end - path : -1);
-}
-
 /*
  * Given a shorthand device name check if a file by that name exists in any
  * of the 'zpool_default_import_path' or ZPOOL_IMPORT_PATH directories.  If
@@ -56,36 +40,35 @@ zfs_dirnamelen(const char *path)
 int
 zfs_resolve_shortname(const char *name, char *path, size_t len)
 {
-	const char *env = getenv("ZPOOL_IMPORT_PATH");
+	int i, error = -1;
+	char *dir, *env, *envdup;
+
+	env = getenv("ZPOOL_IMPORT_PATH");
+	errno = ENOENT;
 
 	if (env) {
-		for (;;) {
-			env += strspn(env, ":");
-			size_t dirlen = strcspn(env, ":");
-			if (dirlen) {
-				(void) snprintf(path, len, "%.*s/%s",
-				    (int)dirlen, env, name);
-				if (access(path, F_OK) == 0)
-					return (0);
-
-				env += dirlen;
-			} else
-				break;
+		envdup = strdup(env);
+		dir = strtok(envdup, ":");
+		while (dir && error) {
+			(void) snprintf(path, len, "%s/%s", dir, name);
+			error = access(path, F_OK);
+			dir = strtok(NULL, ":");
 		}
+		free(envdup);
 	} else {
+		const char * const *zpool_default_import_path;
 		size_t count;
-		const char *const *zpool_default_import_path =
-		    zpool_default_search_paths(&count);
 
-		for (size_t i = 0; i < count; ++i) {
+		zpool_default_import_path = zpool_default_search_paths(&count);
+
+		for (i = 0; i < count && error < 0; i++) {
 			(void) snprintf(path, len, "%s/%s",
 			    zpool_default_import_path[i], name);
-			if (access(path, F_OK) == 0)
-				return (0);
+			error = access(path, F_OK);
 		}
 	}
 
-	return (errno = ENOENT);
+	return (error ? ENOENT : 0);
 }
 
 /*
@@ -99,20 +82,21 @@ static int
 zfs_strcmp_shortname(const char *name, const char *cmp_name, int wholedisk)
 {
 	int path_len, cmp_len, i = 0, error = ENOENT;
-	char *dir, *env, *envdup = NULL, *tmp = NULL;
+	char *dir, *env, *envdup = NULL;
 	char path_name[MAXPATHLEN];
-	const char *const *zpool_default_import_path = NULL;
+	const char * const *zpool_default_import_path;
 	size_t count;
+
+	zpool_default_import_path = zpool_default_search_paths(&count);
 
 	cmp_len = strlen(cmp_name);
 	env = getenv("ZPOOL_IMPORT_PATH");
 
 	if (env) {
 		envdup = strdup(env);
-		dir = strtok_r(envdup, ":", &tmp);
+		dir = strtok(envdup, ":");
 	} else {
-		zpool_default_import_path = zpool_default_search_paths(&count);
-		dir = (char *)zpool_default_import_path[i];
+		dir =  (char *)zpool_default_import_path[i];
 	}
 
 	while (dir) {
@@ -132,7 +116,7 @@ zfs_strcmp_shortname(const char *name, const char *cmp_name, int wholedisk)
 		}
 
 		if (env) {
-			dir = strtok_r(NULL, ":", &tmp);
+			dir = strtok(NULL, ":");
 		} else if (++i < count) {
 			dir = (char *)zpool_default_import_path[i];
 		} else {
@@ -157,17 +141,18 @@ zfs_strcmp_pathname(const char *name, const char *cmp, int wholedisk)
 	int path_len, cmp_len;
 	char path_name[MAXPATHLEN];
 	char cmp_name[MAXPATHLEN];
-	char *dir, *tmp = NULL;
+	char *dir, *dup;
 
-	/* Strip redundant slashes if they exist due to ZPOOL_IMPORT_PATH */
-	cmp_name[0] = '\0';
-	(void) strlcpy(path_name, cmp, sizeof (path_name));
-	for (dir = strtok_r(path_name, "/", &tmp);
-	    dir != NULL;
-	    dir = strtok_r(NULL, "/", &tmp)) {
+	/* Strip redundant slashes if one exists due to ZPOOL_IMPORT_PATH */
+	memset(cmp_name, 0, MAXPATHLEN);
+	dup = strdup(cmp);
+	dir = strtok(dup, "/");
+	while (dir) {
 		strlcat(cmp_name, "/", sizeof (cmp_name));
 		strlcat(cmp_name, dir, sizeof (cmp_name));
+		dir = strtok(NULL, "/");
 	}
+	free(dup);
 
 	if (name[0] != '/')
 		return (zfs_strcmp_shortname(name, cmp_name, wholedisk));

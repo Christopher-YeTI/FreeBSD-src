@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lvm.h,v 2.18.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Lua virtual machine
@@ -42,3 +43,4 @@ LUAI_FUNC void luaV_arith (lua_State *L, StkId ra, const TValue *rb,
 LUAI_FUNC void luaV_objlen (lua_State *L, StkId ra, const TValue *rb);
 
 #endif
+/* END CSTYLED */

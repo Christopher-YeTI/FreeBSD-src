@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -82,7 +82,6 @@ log_must zfs rollback $SNAPPOOL
 log_mustnot zfs snapshot $SNAPPOOL
 
 log_must touch /$TESTPOOL/$TESTFILE
-sync_pool $TESTPOOL
 
 log_must zfs rollback $SNAPPOOL
 log_must zfs create $TESTPOOL/$TESTFILE
@@ -93,15 +92,6 @@ log_note "Verify rollback of multiple nested file systems succeeds."
 log_must zfs snapshot $TESTPOOL/$TESTFILE@$TESTSNAP
 log_must zfs snapshot $SNAPPOOL.1
 
-#
-# Linux: Issuing a `df` seems to properly force any negative dcache entries to
-# be invalidated preventing failures when accessing the mount point. Additional
-# investigation required.
-#
-# https://github.com/openzfs/zfs/issues/6143
-#
-log_must eval "df >/dev/null"
-
 export __ZFS_POOL_RESTRICT="$TESTPOOL"
 log_must zfs unmount -a
 log_must zfs mount -a
@@ -110,6 +100,12 @@ unset __ZFS_POOL_RESTRICT
 log_must touch /$TESTPOOL/$TESTFILE/$TESTFILE.1
 
 log_must zfs rollback $SNAPPOOL.1
-log_must eval "df >/dev/null"
+
+#
+# Workaround for issue #6143.  Issuing a `df` seems to properly force any
+# negative dcache entries to be invalidated preventing subsequent failures
+# when accessing the mount point.  Additional investigation required.
+#
+log_must df
 
 log_pass "Rollbacks succeed when nested file systems are present."

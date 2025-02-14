@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -115,7 +115,7 @@ dsl_dataset_user_hold_check(void *arg, dmu_tx_t *tx)
 	    pair != NULL; pair = nvlist_next_nvpair(dduha->dduha_holds, pair)) {
 		dsl_dataset_t *ds;
 		int error = 0;
-		const char *htag, *name;
+		char *htag, *name;
 
 		/* must be a snapshot */
 		name = nvpair_name(pair);
@@ -346,7 +346,7 @@ dsl_dataset_user_hold(nvlist_t *holds, minor_t cleanup_minor, nvlist_t *errlist)
 	return (ret);
 }
 
-typedef int (dsl_holdfunc_t)(dsl_pool_t *dp, const char *name, const void *tag,
+typedef int (dsl_holdfunc_t)(dsl_pool_t *dp, const char *name, void *tag,
     dsl_dataset_t **dsp);
 
 typedef struct dsl_dataset_user_release_arg {
@@ -359,7 +359,7 @@ typedef struct dsl_dataset_user_release_arg {
 
 /* Place a dataset hold on the snapshot identified by passed dsobj string */
 static int
-dsl_dataset_hold_obj_string(dsl_pool_t *dp, const char *dsobj, const void *tag,
+dsl_dataset_hold_obj_string(dsl_pool_t *dp, const char *dsobj, void *tag,
     dsl_dataset_t **dsp)
 {
 	return (dsl_dataset_hold_obj(dp, zfs_strtonum(dsobj, NULL), tag, dsp));
@@ -572,7 +572,7 @@ dsl_dataset_user_release_impl(nvlist_t *holds, nvlist_t *errlist,
 {
 	dsl_dataset_user_release_arg_t ddura;
 	nvpair_t *pair;
-	const char *pool;
+	char *pool;
 	int error;
 
 	pair = nvlist_next_nvpair(holds, NULL);
@@ -674,7 +674,7 @@ dsl_dataset_get_holds(const char *dsname, nvlist_t *nvl)
 		zap_attribute_t *za;
 		zap_cursor_t zc;
 
-		za = zap_attribute_alloc();
+		za = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
 		for (zap_cursor_init(&zc, ds->ds_dir->dd_pool->dp_meta_objset,
 		    dsl_dataset_phys(ds)->ds_userrefs_obj);
 		    zap_cursor_retrieve(&zc, za) == 0;
@@ -683,7 +683,7 @@ dsl_dataset_get_holds(const char *dsname, nvlist_t *nvl)
 			    za->za_first_integer);
 		}
 		zap_cursor_fini(&zc);
-		zap_attribute_free(za);
+		kmem_free(za, sizeof (zap_attribute_t));
 	}
 	dsl_dataset_rele(ds, FTAG);
 	dsl_pool_rele(dp, FTAG);

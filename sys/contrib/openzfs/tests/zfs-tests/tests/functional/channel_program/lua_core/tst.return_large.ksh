@@ -27,7 +27,7 @@ fs=$TESTPOOL/$TESTFS/testchild
 
 function cleanup
 {
-	datasetexists $fs && destroy_dataset $fs -R
+	datasetexists $fs && log_must zfs destroy -R $fs
 }
 
 log_onexit cleanup
@@ -41,7 +41,8 @@ log_must zfs create $fs
 output_lines=$(log_must zfs program $TESTPOOL \
     $ZCP_ROOT/lua_core/tst.return_large.zcp | wc -l)
 
-log_must [ $output_lines -ge 5000 ]
+[[ $output_lines -lt 5000 ]] &&
+    log_fail "Expected return of full list but only got $output_lines lines"
 
 #
 # Make sure we fail if the return is over the memory limit

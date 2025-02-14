@@ -44,7 +44,7 @@ function cleanup
 	destroy_pool $TESTPOOL
 	destroy_pool $TESTPOOL2
 	unload_scsi_debug
-	rm -fd "$FILE_DEVICE" "$ALTROOT"
+	rm -f "$FILE_DEVICE"
 }
 
 function setup_mirror

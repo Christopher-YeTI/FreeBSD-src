@@ -1,7 +1,16 @@
-libavl_la_CFLAGS  = $(AM_CFLAGS) $(KERNEL_CFLAGS) $(LIBRARY_CFLAGS)
-libavl_la_CFLAGS += -fvisibility=hidden
+include $(top_srcdir)/config/Rules.am
 
-noinst_LTLIBRARIES += libavl.la
+VPATH = $(top_srcdir)/module/avl/
+
+# Includes kernel code, generate warnings for large stack frames
+AM_CFLAGS += $(FRAME_LARGER_THAN)
+
+noinst_LTLIBRARIES = libavl.la
+
+KERNEL_C = \
+	avl.c
 
 nodist_libavl_la_SOURCES = \
-	module/avl/avl.c
+	$(KERNEL_C)
+
+include $(top_srcdir)/config/CppCheck.am

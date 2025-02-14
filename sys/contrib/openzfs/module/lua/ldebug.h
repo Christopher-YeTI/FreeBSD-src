@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: ldebug.h,v 2.7.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Auxiliary functions from Debug Interface module
@@ -32,3 +33,4 @@ LUAI_FUNC l_noret luaG_runerror (lua_State *L, const char *fmt, ...);
 LUAI_FUNC l_noret luaG_errormsg (lua_State *L);
 
 #endif
+/* END CSTYLED */

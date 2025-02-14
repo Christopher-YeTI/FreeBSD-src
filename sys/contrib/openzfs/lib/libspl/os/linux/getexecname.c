@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -19,14 +19,41 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 
 #include <limits.h>
-#include <stdint.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-#include "../../libspl_impl.h"
 
-__attribute__((visibility("hidden"))) ssize_t
-getexecname_impl(char *execname)
+const char *
+getexecname(void)
 {
-	return (readlink("/proc/self/exe", execname, PATH_MAX));
+	static char execname[PATH_MAX + 1] = "";
+	static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+	char *ptr = NULL;
+	ssize_t rc;
+
+	(void) pthread_mutex_lock(&mtx);
+
+	if (strlen(execname) == 0) {
+		rc = readlink("/proc/self/exe",
+		    execname, sizeof (execname) - 1);
+		if (rc == -1) {
+			execname[0] = '\0';
+		} else {
+			execname[rc] = '\0';
+			ptr = execname;
+		}
+	} else {
+		ptr = execname;
+	}
+
+	(void) pthread_mutex_unlock(&mtx);
+	return (ptr);
 }

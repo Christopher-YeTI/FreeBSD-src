@@ -1,19 +1,25 @@
-libuutil_la_CFLAGS = $(AM_CFLAGS) $(LIBRARY_CFLAGS) $(LIBRARY_CFLAGS)
+include $(top_srcdir)/config/Rules.am
 
-lib_LTLIBRARIES += libuutil.la
-CPPCHECKTARGETS += libuutil.la
+lib_LTLIBRARIES = libuutil.la
 
-libuutil_la_SOURCES = \
-	%D%/uu_alloc.c \
-	%D%/uu_avl.c \
-	%D%/uu_ident.c \
-	%D%/uu_list.c \
-	%D%/uu_misc.c \
-	%D%/uu_string.c
+include $(top_srcdir)/config/Abigail.am
+
+USER_C = \
+	uu_alloc.c \
+	uu_avl.c \
+	uu_dprintf.c \
+	uu_ident.c \
+	uu_list.c \
+	uu_misc.c \
+	uu_open.c \
+	uu_pname.c \
+	uu_string.c
+
+libuutil_la_SOURCES = $(USER_C)
 
 libuutil_la_LIBADD = \
-	libavl.la \
-	libspl.la
+	$(abs_top_builddir)/lib/libavl/libavl.la \
+	$(abs_top_builddir)/lib/libspl/libspl.la
 
 libuutil_la_LIBADD += $(LTLIBINTL)
 
@@ -25,4 +31,7 @@ endif
 
 libuutil_la_LDFLAGS += -version-info 3:0:0
 
-dist_noinst_DATA += %D%/libuutil.abi %D%/libuutil.suppr
+include $(top_srcdir)/config/CppCheck.am
+
+# Library ABI
+EXTRA_DIST = libuutil.abi libuutil.suppr

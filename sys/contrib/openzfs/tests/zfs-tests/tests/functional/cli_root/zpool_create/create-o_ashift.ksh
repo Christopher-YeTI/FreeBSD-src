@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -59,7 +59,8 @@ function write_device_uberblocks # <device> <pool>
 	typeset device=$1
 	typeset pool=$2
 
-	while zdb -quuul $device | grep -q 'invalid'; do
+	while [ "$(zdb -quuul $device | grep -c 'invalid')" -ne 0 ]
+	do
 		sync_pool $pool true
 	done
 }
@@ -88,6 +89,8 @@ function verify_device_uberblocks # <device> <count>
 	            exit 1
 	        }
 	    }'
+
+	return $?
 }
 
 log_assert "zpool create -o ashift=<n>' works with different ashift values"
@@ -111,8 +114,11 @@ do
 		    "$ashift (current = $pprop)"
 	fi
 	write_device_uberblocks $disk $TESTPOOL
-	log_must verify_device_uberblocks $disk ${ubcount[$i]}
-
+	verify_device_uberblocks $disk ${ubcount[$i]}
+	if [[ $? -ne 0 ]]
+	then
+		log_fail "Pool was created with unexpected number of uberblocks"
+	fi
 	# clean things for the next run
 	log_must zpool destroy $TESTPOOL
 	log_must zpool labelclear $disk

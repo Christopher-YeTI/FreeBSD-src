@@ -97,18 +97,13 @@
 #if defined(__x86_64__) && defined(HAVE_AVX) && \
     defined(HAVE_AES) && defined(HAVE_PCLMULQDQ)
 
-#define _ASM
-#include <sys/asm_linkage.h>
-
 .text
 
-/* Windows userland links with OpenSSL */
-#if !defined (_WIN32) || defined (_KERNEL)
-ENTRY_ALIGN(gcm_gmult_clmul, 16)
-
+.globl	gcm_gmult_clmul
+.type	gcm_gmult_clmul,@function
+.align	16
+gcm_gmult_clmul:
 .cfi_startproc
-	ENDBR
-
 .L_gmult_clmul:
 	movdqu	(%rdi),%xmm0
 	movdqa	.Lbswap_mask(%rip),%xmm5
@@ -154,14 +149,15 @@ ENTRY_ALIGN(gcm_gmult_clmul, 16)
 	pxor	%xmm1,%xmm0
 .byte	102,15,56,0,197
 	movdqu	%xmm0,(%rdi)
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(gcm_gmult_clmul)
-#endif /* !_WIN32 || _KERNEL */
+.size	gcm_gmult_clmul,.-gcm_gmult_clmul
 
-ENTRY_ALIGN(gcm_init_htab_avx, 32)
+.globl	gcm_init_htab_avx
+.type	gcm_init_htab_avx,@function
+.align	32
+gcm_init_htab_avx:
 .cfi_startproc
-	ENDBR
 	vzeroupper
 
 	vmovdqu	(%rsi),%xmm2
@@ -188,7 +184,7 @@ ENTRY_ALIGN(gcm_init_htab_avx, 32)
 	vpxor	%xmm2,%xmm6,%xmm6
 	movq	$4,%r10
 	jmp	.Linit_start_avx
-.balign	32
+.align	32
 .Linit_loop_avx:
 	vpalignr	$8,%xmm3,%xmm4,%xmm5
 	vmovdqu	%xmm5,-16(%rdi)
@@ -266,21 +262,23 @@ ENTRY_ALIGN(gcm_init_htab_avx, 32)
 	vmovdqu	%xmm5,-16(%rdi)
 
 	vzeroupper
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(gcm_init_htab_avx)
+.size	gcm_init_htab_avx,.-gcm_init_htab_avx
 
-#if !defined (_WIN32) || defined (_KERNEL)
-ENTRY_ALIGN(gcm_gmult_avx, 32)
+.globl	gcm_gmult_avx
+.type	gcm_gmult_avx,@function
+.align	32
+gcm_gmult_avx:
 .cfi_startproc
-	ENDBR
 	jmp	.L_gmult_clmul
 .cfi_endproc
-SET_SIZE(gcm_gmult_avx)
-
-ENTRY_ALIGN(gcm_ghash_avx, 32)
+.size	gcm_gmult_avx,.-gcm_gmult_avx
+.globl	gcm_ghash_avx
+.type	gcm_ghash_avx,@function
+.align	32
+gcm_ghash_avx:
 .cfi_startproc
-	ENDBR
 	vzeroupper
 
 	vmovdqu	(%rdi),%xmm10
@@ -386,7 +384,7 @@ ENTRY_ALIGN(gcm_ghash_avx, 32)
 	subq	$0x80,%rcx
 	jmp	.Loop8x_avx
 
-.balign	32
+.align	32
 .Loop8x_avx:
 	vpunpckhqdq	%xmm15,%xmm15,%xmm8
 	vmovdqu	112(%rdx),%xmm14
@@ -506,7 +504,7 @@ ENTRY_ALIGN(gcm_ghash_avx, 32)
 	addq	$0x80,%rcx
 	jmp	.Ltail_no_xor_avx
 
-.balign	32
+.align	32
 .Lshort_avx:
 	vmovdqu	-16(%rdx,%rcx,1),%xmm14
 	leaq	(%rdx,%rcx,1),%rdx
@@ -610,7 +608,7 @@ ENTRY_ALIGN(gcm_ghash_avx, 32)
 	subq	$0x10,%rcx
 	jmp	.Ltail_avx
 
-.balign	32
+.align	32
 .Ltail_avx:
 	vpxor	%xmm10,%xmm15,%xmm15
 .Ltail_no_xor_avx:
@@ -651,14 +649,10 @@ ENTRY_ALIGN(gcm_ghash_avx, 32)
 	vpshufb	%xmm13,%xmm10,%xmm10
 	vmovdqu	%xmm10,(%rdi)
 	vzeroupper
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(gcm_ghash_avx)
-
-#endif /* !_WIN32 || _KERNEL */
-
-SECTION_STATIC
-.balign	64
+.size	gcm_ghash_avx,.-gcm_ghash_avx
+.align	64
 .Lbswap_mask:
 .byte	15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
 .L0x1c2_polynomial:
@@ -667,14 +661,14 @@ SECTION_STATIC
 .long	7,0,7,0
 .L7_mask_poly:
 .long	7,0,450,0
-.balign	64
-SET_OBJ(.Lrem_4bit)
+.align	64
+.type	.Lrem_4bit,@object
 .Lrem_4bit:
 .long	0,0,0,471859200,0,943718400,0,610271232
 .long	0,1887436800,0,1822425088,0,1220542464,0,1423966208
 .long	0,3774873600,0,4246732800,0,3644850176,0,3311403008
 .long	0,2441084928,0,2376073216,0,2847932416,0,3051356160
-SET_OBJ(.Lrem_8bit)
+.type	.Lrem_8bit,@object
 .Lrem_8bit:
 .value	0x0000,0x01C2,0x0384,0x0246,0x0708,0x06CA,0x048C,0x054E
 .value	0x0E10,0x0FD2,0x0D94,0x0C56,0x0918,0x08DA,0x0A9C,0x0B5E
@@ -710,7 +704,7 @@ SET_OBJ(.Lrem_8bit)
 .value	0xBBF0,0xBA32,0xB874,0xB9B6,0xBCF8,0xBD3A,0xBF7C,0xBEBE
 
 .byte	71,72,65,83,72,32,102,111,114,32,120,56,54,95,54,52,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
-.balign	64
+.align	64
 
 /* Mark the stack non-executable. */
 #if defined(__linux__) && defined(__ELF__)

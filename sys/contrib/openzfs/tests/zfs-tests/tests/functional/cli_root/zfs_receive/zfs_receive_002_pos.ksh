@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -50,8 +50,10 @@ function cleanup
 	typeset ds
 
 	while (( i < ${#orig_snap[*]} )); do
-		snapexists ${rst_snap[$i]} && destroy_dataset ${rst_snap[$i]} -f
-		snapexists ${orig_snap[$i]} && destroy_dataset ${orig_snap[$i]} -f
+		snapexists ${rst_snap[$i]} && \
+			log_must zfs destroy -f ${rst_snap[$i]}
+		snapexists ${orig_snap[$i]} && \
+			log_must zfs destroy -f ${orig_snap[$i]}
 		[[ -e ${bkup[$i]} ]] && \
 			log_must rm -rf ${bkup[$i]}
 
@@ -59,7 +61,8 @@ function cleanup
 	done
 
 	for ds in $rst_vol $rst_root; do
-		datasetexists $ds && destroy_dataset $ds -Rf
+		datasetexists $ds && \
+			log_must zfs destroy -Rf $ds
 	done
 }
 

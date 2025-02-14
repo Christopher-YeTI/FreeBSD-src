@@ -15,14 +15,18 @@
 # Copyright (c) 2012, 2018 by Delphix. All rights reserved.
 # Copyright (c) 2019 Datto Inc.
 #
-# This script must remain compatible with Python 3.6+.
+# This script must remain compatible with Python 2.6+ and Python 3.4+.
 #
+
+# some python 2.7 system don't have a configparser shim
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
 import os
 import sys
 import ctypes
-import re
-import configparser
 
 from datetime import datetime
 from optparse import OptionParser
@@ -31,14 +35,11 @@ from pwd import getpwuid
 from select import select
 from subprocess import PIPE
 from subprocess import Popen
-from subprocess import check_output
 from threading import Timer
-from time import time, CLOCK_MONOTONIC
-from os.path import exists
+from time import time
 
 BASEDIR = '/var/tmp/test_results'
 TESTDIR = '/usr/share/zfs/'
-KMEMLEAK_FILE = '/sys/kernel/debug/kmemleak'
 KILL = 'kill'
 TRUE = 'true'
 SUDO = 'sudo'
@@ -47,25 +48,28 @@ LOG_OUT = 'LOG_OUT'
 LOG_ERR = 'LOG_ERR'
 LOG_FILE_OBJ = None
 
-try:
-    from time import monotonic as monotonic_time
-except ImportError:
-    class timespec(ctypes.Structure):
-        _fields_ = [
-            ('tv_sec', ctypes.c_long),
-            ('tv_nsec', ctypes.c_long)
-        ]
+# some python 2.7 system don't have a concept of monotonic time
+CLOCK_MONOTONIC_RAW = 4  # see <linux/time.h>
 
-    librt = ctypes.CDLL('librt.so.1', use_errno=True)
-    clock_gettime = librt.clock_gettime
-    clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(timespec)]
 
-    def monotonic_time():
-        t = timespec()
-        if clock_gettime(CLOCK_MONOTONIC, ctypes.pointer(t)) != 0:
-            errno_ = ctypes.get_errno()
-            raise OSError(errno_, os.strerror(errno_))
-        return t.tv_sec + t.tv_nsec * 1e-9
+class timespec(ctypes.Structure):
+    _fields_ = [
+        ('tv_sec', ctypes.c_long),
+        ('tv_nsec', ctypes.c_long)
+    ]
+
+
+librt = ctypes.CDLL('librt.so.1', use_errno=True)
+clock_gettime = librt.clock_gettime
+clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(timespec)]
+
+
+def monotonic_time():
+    t = timespec()
+    if clock_gettime(CLOCK_MONOTONIC_RAW, ctypes.pointer(t)) != 0:
+        errno_ = ctypes.get_errno()
+        raise OSError(errno_, os.strerror(errno_))
+    return t.tv_sec + t.tv_nsec * 1e-9
 
 
 class Result(object):
@@ -78,7 +82,6 @@ class Result(object):
         self.runtime = ''
         self.stdout = []
         self.stderr = []
-        self.kmemleak = ''
         self.result = ''
 
     def done(self, proc, killed, reran):
@@ -94,9 +97,6 @@ class Result(object):
         if killed:
             self.result = 'KILLED'
             Result.runresults['KILLED'] += 1
-        elif len(self.kmemleak) > 0:
-            self.result = 'FAIL'
-            Result.runresults['FAIL'] += 1
         elif self.returncode == 0:
             self.result = 'PASS'
             Result.runresults['PASS'] += 1
@@ -111,11 +111,10 @@ class Result(object):
 class Output(object):
     """
     This class is a slightly modified version of the 'Stream' class found
-    here: https://stackoverflow.com/q/4984549/
+    here: http://goo.gl/aSGfv
     """
-    def __init__(self, stream, debug=False):
+    def __init__(self, stream):
         self.stream = stream
-        self.debug = debug
         self._buf = b''
         self.lines = []
 
@@ -141,8 +140,6 @@ class Output(object):
         buf = os.read(fd, 4096)
         if not buf:
             return None
-        if self.debug:
-            os.write(sys.stderr.fileno(), buf)
         if b'\n' not in buf:
             self._buf += buf
             return []
@@ -184,7 +181,7 @@ Timeout: %d
 User: %s
 ''' % (self.pathname, self.identifier, self.outputdir, self.timeout, self.user)
 
-    def kill_cmd(self, proc, options, kmemleak, keyboard_interrupt=False):
+    def kill_cmd(self, proc, keyboard_interrupt=False):
         """
         Kill a running command due to timeout, or ^C from the keyboard. If
         sudo is required, this user was verified previously.
@@ -214,7 +211,7 @@ User: %s
             if int(self.timeout) > runtime:
                 self.killed = False
                 self.reran = False
-                self.run(options, dryrun=False, kmemleak=kmemleak)
+                self.run(False)
                 self.reran = True
 
     def update_cmd_privs(self, cmd, user):
@@ -241,14 +238,14 @@ User: %s
         ret = '%s -E -u %s %s' % (SUDO, user, cmd)
         return ret.split(' ')
 
-    def collect_output(self, proc, debug=False):
+    def collect_output(self, proc):
         """
         Read from stdout/stderr as data becomes available, until the
         process is no longer running. Return the lines from the stdout and
         stderr Output objects.
         """
-        out = Output(proc.stdout, debug)
-        err = Output(proc.stderr, debug)
+        out = Output(proc.stdout)
+        err = Output(proc.stderr)
         res = []
         while proc.returncode is None:
             proc.poll()
@@ -260,19 +257,15 @@ User: %s
 
         return out.lines, err.lines
 
-    def run(self, options, dryrun=None, kmemleak=None):
+    def run(self, dryrun):
         """
         This is the main function that runs each individual test.
         Determine whether or not the command requires sudo, and modify it
         if needed. Run the command, and update the result object.
         """
-        if dryrun is None:
-            dryrun = options.dryrun
         if dryrun is True:
             print(self)
             return
-        if kmemleak is None:
-            kmemleak = options.kmemleak
 
         privcmd = self.update_cmd_privs(self.pathname, self.user)
         try:
@@ -283,58 +276,18 @@ User: %s
         except OSError as e:
             fail('%s' % e)
 
-        """
-        Log each test we run to /dev/kmsg (on Linux), so if there's a kernel
-        warning we'll be able to match it up to a particular test.
-        """
-        if options.kmsg is True and exists("/dev/kmsg"):
-            try:
-                kp = Popen([SUDO, "sh", "-c",
-                            f"echo ZTS run {self.pathname} > /dev/kmsg"])
-                kp.wait()
-            except Exception:
-                pass
-
-        """
-        Log each test we run to /dev/ttyu0 (on FreeBSD), so if there's a kernel
-        warning we'll be able to match it up to a particular test.
-        """
-        if options.kmsg is True and exists("/dev/ttyu0"):
-            try:
-                kp = Popen([SUDO, "sh", "-c",
-                            f"echo ZTS run {self.pathname} > /dev/ttyu0"])
-                kp.wait()
-            except Exception:
-                pass
-
         self.result.starttime = monotonic_time()
-
-        if kmemleak:
-            cmd = f'{SUDO} sh -c "echo clear > {KMEMLEAK_FILE}"'
-            check_output(cmd, shell=True)
-
         proc = Popen(privcmd, stdout=PIPE, stderr=PIPE)
         # Allow a special timeout value of 0 to mean infinity
         if int(self.timeout) == 0:
-            self.timeout = sys.maxsize / (10 ** 9)
-        t = Timer(
-            int(self.timeout), self.kill_cmd, [proc, options, kmemleak]
-        )
+            self.timeout = sys.maxsize
+        t = Timer(int(self.timeout), self.kill_cmd, [proc])
 
         try:
             t.start()
-
-            out, err = self.collect_output(proc, options.debug)
-            self.result.stdout = out
-            self.result.stderr = err
-
-            if kmemleak:
-                cmd = f'{SUDO} sh -c "echo scan > {KMEMLEAK_FILE}"'
-                check_output(cmd, shell=True)
-                cmd = f'{SUDO} cat {KMEMLEAK_FILE}'
-                self.result.kmemleak = check_output(cmd, shell=True)
+            self.result.stdout, self.result.stderr = self.collect_output(proc)
         except KeyboardInterrupt:
-            self.kill_cmd(proc, options, kmemleak, True)
+            self.kill_cmd(proc, True)
             fail('\nRun terminated at user request.')
         finally:
             t.cancel()
@@ -409,9 +362,6 @@ User: %s
             with open(os.path.join(self.outputdir, 'merged'), 'wb') as merged:
                 for _, line in lines:
                     os.write(merged.fileno(), b'%s\n' % line)
-        if len(self.result.kmemleak):
-            with open(os.path.join(self.outputdir, 'kmemleak'), 'wb') as kmem:
-                kmem.write(self.result.kmemleak)
 
 
 class Test(Cmd):
@@ -474,7 +424,7 @@ Tags: %s
 
         return True
 
-    def run(self, options, dryrun=None, kmemleak=None):
+    def run(self, options):
         """
         Create Cmd instances for the pre/post/failsafe scripts. If the pre
         script doesn't pass, skip this Test. Run the post script regardless.
@@ -496,14 +446,14 @@ Tags: %s
 
         cont = True
         if len(pretest.pathname):
-            pretest.run(options, kmemleak=False)
+            pretest.run(options.dryrun)
             cont = pretest.result.result == 'PASS'
             pretest.log(options)
 
         if cont:
-            test.run(options, kmemleak=kmemleak)
+            test.run(options.dryrun)
             if test.result.result == 'KILLED' and len(failsafe.pathname):
-                failsafe.run(options, kmemleak=False)
+                failsafe.run(options.dryrun)
                 failsafe.log(options, suppress_console=True)
         else:
             test.skip()
@@ -511,7 +461,7 @@ Tags: %s
         test.log(options)
 
         if len(posttest.pathname):
-            posttest.run(options, kmemleak=False)
+            posttest.run(options.dryrun)
             posttest.log(options)
 
 
@@ -544,9 +494,6 @@ Tags: %s
 ''' % (self.pathname, self.identifier, self.outputdir, self.tests,
             self.timeout, self.user, self.pre, pre_user, self.post, post_user,
             self.failsafe, failsafe_user, self.tags)
-
-    def filter(self, keeplist):
-        self.tests = [x for x in self.tests if x in keeplist]
 
     def verify(self):
         """
@@ -595,7 +542,7 @@ Tags: %s
 
         return len(self.tests) != 0
 
-    def run(self, options, dryrun=None, kmemleak=None):
+    def run(self, options):
         """
         Create Cmd instances for the pre/post/failsafe scripts. If the pre
         script doesn't pass, skip all the tests in this TestGroup. Run the
@@ -614,7 +561,7 @@ Tags: %s
 
         cont = True
         if len(pretest.pathname):
-            pretest.run(options, dryrun=dryrun, kmemleak=False)
+            pretest.run(options.dryrun)
             cont = pretest.result.result == 'PASS'
             pretest.log(options)
 
@@ -627,9 +574,9 @@ Tags: %s
             failsafe = Cmd(self.failsafe, outputdir=odir, timeout=self.timeout,
                            user=self.failsafe_user, identifier=self.identifier)
             if cont:
-                test.run(options, dryrun=dryrun, kmemleak=kmemleak)
+                test.run(options.dryrun)
                 if test.result.result == 'KILLED' and len(failsafe.pathname):
-                    failsafe.run(options, dryrun=dryrun, kmemleak=False)
+                    failsafe.run(options.dryrun)
                     failsafe.log(options, suppress_console=True)
             else:
                 test.skip()
@@ -637,12 +584,12 @@ Tags: %s
             test.log(options)
 
         if len(posttest.pathname):
-            posttest.run(options, dryrun=dryrun, kmemleak=False)
+            posttest.run(options.dryrun)
             posttest.log(options)
 
 
 class TestRun(object):
-    props = ['quiet', 'outputdir', 'debug']
+    props = ['quiet', 'outputdir']
 
     def __init__(self, options):
         self.tests = {}
@@ -662,8 +609,7 @@ class TestRun(object):
             ('post_user', ''),
             ('failsafe', ''),
             ('failsafe_user', ''),
-            ('tags', []),
-            ('debug', False)
+            ('tags', [])
         ]
 
     def __str__(self):
@@ -709,24 +655,6 @@ class TestRun(object):
             self.testgroups[dirname].tests = sorted(filenames)
 
             testgroup.verify()
-
-    def filter(self, keeplist):
-        for group in list(self.testgroups.keys()):
-            if group not in keeplist:
-                del self.testgroups[group]
-                continue
-
-            g = self.testgroups[group]
-
-            if g.pre and os.path.basename(g.pre) in keeplist[group]:
-                continue
-
-            g.filter(keeplist[group])
-
-        for test in list(self.tests.keys()):
-            directory, base = os.path.split(test)
-            if directory not in keeplist or base not in keeplist[directory]:
-                del self.tests[test]
 
     def read(self, options):
         """
@@ -815,18 +743,10 @@ class TestRun(object):
 
         for test in sorted(self.tests.keys()):
             config.add_section(test)
-            for prop in Test.props:
-                if prop not in self.props:
-                    config.set(test, prop,
-                               getattr(self.tests[test], prop))
 
         for testgroup in sorted(self.testgroups.keys()):
             config.add_section(testgroup)
             config.set(testgroup, 'tests', self.testgroups[testgroup].tests)
-            for prop in TestGroup.props:
-                if prop not in self.props:
-                    config.set(testgroup, prop,
-                               getattr(self.testgroups[testgroup], prop))
 
         try:
             with open(options.template, 'w') as f:
@@ -876,7 +796,7 @@ class TestRun(object):
             return
 
         global LOG_FILE_OBJ
-        if not options.template:
+        if options.cmd != 'wrconfig':
             try:
                 old = os.umask(0)
                 os.makedirs(self.outputdir, mode=0o777)
@@ -903,11 +823,6 @@ class TestRun(object):
         else:
             write_log('Could not make a symlink to directory %s\n' %
                       self.outputdir, LOG_ERR)
-
-        if options.kmemleak:
-            cmd = f'{SUDO} -c "echo scan=0 > {KMEMLEAK_FILE}"'
-            check_output(cmd, shell=True)
-
         iteration = 0
         while iteration < options.iterations:
             for test in sorted(self.tests.keys()):
@@ -1024,45 +939,17 @@ def find_tests(testrun, options):
             testrun.addtest(p, options)
 
 
-def filter_tests(testrun, options):
-    try:
-        fh = open(options.logfile, "r")
-    except Exception as e:
-        fail('%s' % e)
-
-    failed = {}
-    while True:
-        line = fh.readline()
-        if not line:
-            break
-        m = re.match(r'Test: .*(tests/.*)/(\S+).*\[FAIL\]', line)
-        if not m:
-            continue
-        group, test = m.group(1, 2)
-        try:
-            failed[group].append(test)
-        except KeyError:
-            failed[group] = [test]
-    fh.close()
-
-    testrun.filter(failed)
-
-
 def fail(retstr, ret=1):
     print('%s: %s' % (sys.argv[0], retstr))
     exit(ret)
 
 
-def kmemleak_cb(option, opt_str, value, parser):
-    if not os.path.exists(KMEMLEAK_FILE):
-        fail(f"File '{KMEMLEAK_FILE}' doesn't exist. " +
-             "Enable CONFIG_DEBUG_KMEMLEAK in kernel configuration.")
-
-    setattr(parser.values, option.dest, True)
-
-
 def options_cb(option, opt_str, value, parser):
-    path_options = ['outputdir', 'template', 'testdir', 'logfile']
+    path_options = ['outputdir', 'template', 'testdir']
+
+    if option.dest == 'runfiles' and '-w' in parser.rargs or \
+            option.dest == 'template' and '-c' in parser.rargs:
+        fail('-c and -w are mutually exclusive.')
 
     if opt_str in parser.rargs:
         fail('%s may only be specified once.' % opt_str)
@@ -1070,6 +957,8 @@ def options_cb(option, opt_str, value, parser):
     if option.dest == 'runfiles':
         parser.values.cmd = 'rdconfig'
         value = set(os.path.abspath(p) for p in value.split(','))
+    if option.dest == 'template':
+        parser.values.cmd = 'wrconfig'
     if option.dest == 'tags':
         value = [x.strip() for x in value.split(',')]
 
@@ -1086,12 +975,6 @@ def parse_args():
                       help='Specify tests to run via config files.')
     parser.add_option('-d', action='store_true', default=False, dest='dryrun',
                       help='Dry run. Print tests, but take no other action.')
-    parser.add_option('-D', action='store_true', default=False, dest='debug',
-                      help='Write all test output to stdout as it arrives.')
-    parser.add_option('-l', action='callback', callback=options_cb,
-                      default=None, dest='logfile', metavar='logfile',
-                      type='string',
-                      help='Read logfile and re-run tests which failed.')
     parser.add_option('-g', action='store_true', default=False,
                       dest='do_groups', help='Make directories TestGroups.')
     parser.add_option('-o', action='callback', callback=options_cb,
@@ -1100,11 +983,6 @@ def parse_args():
     parser.add_option('-i', action='callback', callback=options_cb,
                       default=TESTDIR, dest='testdir', type='string',
                       metavar='testdir', help='Specify a test directory.')
-    parser.add_option('-K', action='store_true', default=False, dest='kmsg',
-                      help='Log tests names to /dev/kmsg')
-    parser.add_option('-m', action='callback', callback=kmemleak_cb,
-                      default=False, dest='kmemleak',
-                      help='Enable kmemleak reporting (Linux only)')
     parser.add_option('-p', action='callback', callback=options_cb,
                       default='', dest='pre', metavar='script',
                       type='string', help='Specify a pre script.')
@@ -1143,6 +1021,9 @@ def parse_args():
                       help='Number of times to run the test run.')
     (options, pathnames) = parser.parse_args()
 
+    if not options.runfiles and not options.template:
+        options.cmd = 'runtests'
+
     if options.runfiles and len(pathnames):
         fail('Extraneous arguments.')
 
@@ -1153,20 +1034,18 @@ def parse_args():
 
 def main():
     options = parse_args()
-
     testrun = TestRun(options)
 
-    if options.runfiles:
-        testrun.read(options)
-    else:
+    if options.cmd == 'runtests':
         find_tests(testrun, options)
-
-    if options.logfile:
-        filter_tests(testrun, options)
-
-    if options.template:
+    elif options.cmd == 'rdconfig':
+        testrun.read(options)
+    elif options.cmd == 'wrconfig':
+        find_tests(testrun, options)
         testrun.write(options)
         exit(0)
+    else:
+        fail('Unknown command specified')
 
     testrun.complete_outputdirs()
     testrun.run(options)

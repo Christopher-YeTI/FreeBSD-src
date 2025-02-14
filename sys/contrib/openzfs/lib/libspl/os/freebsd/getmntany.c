@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -36,7 +36,6 @@
 #include <sys/sysmacros.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libzutil.h>
 
 int
 getextmntent(const char *path, struct extmnttab *entry, struct stat64 *statbuf)
@@ -50,13 +49,13 @@ getextmntent(const char *path, struct extmnttab *entry, struct stat64 *statbuf)
 
 	if (stat64(path, statbuf) != 0) {
 		(void) fprintf(stderr, "cannot open '%s': %s\n",
-		    path, zfs_strerror(errno));
+		    path, strerror(errno));
 		return (-1);
 	}
 
 	if (statfs(path, &sfs) != 0) {
 		(void) fprintf(stderr, "%s: %s\n", path,
-		    zfs_strerror(errno));
+		    strerror(errno));
 		return (-1);
 	}
 	statfs2mnttab(&sfs, (struct mnttab *)entry);

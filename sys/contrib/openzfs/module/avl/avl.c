@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -108,9 +108,20 @@
 #include <sys/cmn_err.h>
 #include <sys/mod.h>
 
-#ifndef _KERNEL
-#include <string.h>
-#endif
+/*
+ * Small arrays to translate between balance (or diff) values and child indices.
+ *
+ * Code that deals with binary tree data structures will randomly use
+ * left and right children when examining a tree.  C "if()" statements
+ * which evaluate randomly suffer from very poor hardware branch prediction.
+ * In this code we avoid some of the branch mispredictions by using the
+ * following translation arrays. They replace random branches with an
+ * additional memory reference. Since the translation arrays are both very
+ * small the data should remain efficiently in cache.
+ */
+static const int  avl_child2balance[2]	= {-1, 1};
+static const int  avl_balance2child[]	= {0, 0, 1};
+
 
 /*
  * Walk from one node to the previous valued node (ie. an infix walk
@@ -267,7 +278,8 @@ avl_find(avl_tree_t *tree, const void *value, avl_index_t *where)
 #endif
 			return (AVL_NODE2DATA(node, off));
 		}
-		child = (diff > 0);
+		child = avl_balance2child[1 + diff];
+
 	}
 
 	if (where != NULL)
@@ -307,6 +319,7 @@ avl_rotation(avl_tree_t *tree, avl_node_t *node, int balance)
 	int which_child = AVL_XCHILD(node);
 	int child_bal = AVL_XBALANCE(child);
 
+	/* BEGIN CSTYLED */
 	/*
 	 * case 1 : node is overly left heavy, the left child is balanced or
 	 * also left heavy. This requires the following rotation.
@@ -332,6 +345,7 @@ avl_rotation(avl_tree_t *tree, avl_node_t *node, int balance)
 	 * we detect this situation by noting that child's balance is not
 	 * right_heavy.
 	 */
+	/* END CSTYLED */
 	if (child_bal != right_heavy) {
 
 		/*
@@ -374,6 +388,7 @@ avl_rotation(avl_tree_t *tree, avl_node_t *node, int balance)
 		return (child_bal == 0);
 	}
 
+	/* BEGIN CSTYLED */
 	/*
 	 * case 2 : When node is left heavy, but child is right heavy we use
 	 * a different rotation.
@@ -405,6 +420,7 @@ avl_rotation(avl_tree_t *tree, avl_node_t *node, int balance)
 	 *	 if gchild was right_heavy, then child is now left heavy
 	 *		else it is balanced
 	 */
+	/* END CSTYLED */
 	gchild = child->avl_child[right];
 	gleft = gchild->avl_child[left];
 	gright = gchild->avl_child[right];
@@ -515,7 +531,7 @@ avl_insert(avl_tree_t *tree, void *new_data, avl_index_t where)
 		 * Compute the new balance
 		 */
 		old_balance = AVL_XBALANCE(node);
-		new_balance = old_balance + (which_child ? 1 : -1);
+		new_balance = old_balance + avl_child2balance[which_child];
 
 		/*
 		 * If we introduced equal balance, then we are done immediately
@@ -681,7 +697,7 @@ avl_remove(avl_tree_t *tree, void *data)
 		 * choose node to swap from whichever side is taller
 		 */
 		old_balance = AVL_XBALANCE(delete);
-		left = (old_balance > 0);
+		left = avl_balance2child[old_balance + 1];
 		right = 1 - left;
 
 		/*
@@ -699,7 +715,7 @@ avl_remove(avl_tree_t *tree, void *data)
 		 */
 		tmp = *node;
 
-		memcpy(node, delete, sizeof (*node));
+		*node = *delete;
 		if (node->avl_child[left] == node)
 			node->avl_child[left] = &tmp;
 
@@ -765,7 +781,7 @@ avl_remove(avl_tree_t *tree, void *data)
 		 */
 		node = parent;
 		old_balance = AVL_XBALANCE(node);
-		new_balance = old_balance - (which_child ? 1 : -1);
+		new_balance = old_balance - avl_child2balance[which_child];
 		parent = AVL_XPARENT(node);
 		which_child = AVL_XCHILD(node);
 
@@ -859,6 +875,7 @@ avl_swap(avl_tree_t *tree1, avl_tree_t *tree2)
 
 	ASSERT3P(tree1->avl_compar, ==, tree2->avl_compar);
 	ASSERT3U(tree1->avl_offset, ==, tree2->avl_offset);
+	ASSERT3U(tree1->avl_size, ==, tree2->avl_size);
 
 	temp_node = tree1->avl_root;
 	temp_numnodes = tree1->avl_numnodes;
@@ -886,12 +903,14 @@ avl_create(avl_tree_t *tree, int (*compar) (const void *, const void *),
 	tree->avl_compar = compar;
 	tree->avl_root = NULL;
 	tree->avl_numnodes = 0;
+	tree->avl_size = size;
 	tree->avl_offset = offset;
 }
 
 /*
  * Delete a tree.
  */
+/* ARGSUSED */
 void
 avl_destroy(avl_tree_t *tree)
 {
@@ -1031,6 +1050,28 @@ done:
 
 	return (AVL_NODE2DATA(node, off));
 }
+
+#if defined(_KERNEL)
+
+static int __init
+avl_init(void)
+{
+	return (0);
+}
+
+static void __exit
+avl_fini(void)
+{
+}
+
+module_init(avl_init);
+module_exit(avl_fini);
+#endif
+
+ZFS_MODULE_DESCRIPTION("Generic AVL tree implementation");
+ZFS_MODULE_AUTHOR(ZFS_META_AUTHOR);
+ZFS_MODULE_LICENSE(ZFS_META_LICENSE);
+ZFS_MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
 
 EXPORT_SYMBOL(avl_create);
 EXPORT_SYMBOL(avl_find);

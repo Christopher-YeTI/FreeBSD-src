@@ -79,7 +79,7 @@ log_must wait_for_removal $TESTPOOL
 # Run sync once to ensure that the config actually changed.
 #
 log_must zpool add $TESTPOOL $DISK2
-sync_all_pools
+log_must sync
 
 #
 # Ensure that zdb does not find any problems with this.

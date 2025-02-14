@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lstring.h,v 1.49.1.1 2013/04/12 18:48:47 roberto Exp $
 ** String table (keep all strings handled by Lua)
@@ -12,7 +13,7 @@
 #include "lstate.h"
 
 
-#define sizestring(s)	(sizeof(struct TString)+((s)->len+1)*sizeof(char))
+#define sizestring(s)	(sizeof(union TString)+((s)->len+1)*sizeof(char))
 
 #define sizeudata(u)	(sizeof(union Udata)+(u)->len)
 
@@ -44,3 +45,4 @@ LUAI_FUNC TString *luaS_new (lua_State *L, const char *str);
 
 
 #endif
+/* END CSTYLED */

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -65,8 +65,7 @@ list_create(list_t *list, size_t size, size_t offset)
 	ASSERT(size > 0);
 	ASSERT(size >= offset + sizeof (list_node_t));
 
-	(void) size;
-
+	list->list_size = size;
 	list->list_offset = offset;
 	list->list_head.next = list->list_head.prev = &list->list_head;
 }
@@ -195,6 +194,7 @@ list_move_tail(list_t *dst, list_t *src)
 	list_node_t *dstnode = &dst->list_head;
 	list_node_t *srcnode = &src->list_head;
 
+	ASSERT(dst->list_size == src->list_size);
 	ASSERT(dst->list_offset == src->list_offset);
 
 	if (list_empty(src))

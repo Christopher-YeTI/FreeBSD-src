@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -38,11 +38,10 @@
 #include <sys/sysmacros.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libzutil.h>
 
 #define	BUFSIZE	(MNT_LINE_MAX + 2)
 
-static __thread char buf[BUFSIZE];
+__thread char buf[BUFSIZE];
 
 #define	DIFF(xx)	( \
 	    (mrefp->xx != NULL) && \
@@ -84,7 +83,7 @@ _sol_getmntent(FILE *fp, struct mnttab *mgetp)
 }
 
 static int
-getextmntent_impl(FILE *fp, struct extmnttab *mp)
+getextmntent_impl(FILE *fp, struct extmnttab *mp, int len)
 {
 	int ret;
 	struct stat64 st;
@@ -123,12 +122,16 @@ getextmntent(const char *path, struct extmnttab *entry, struct stat64 *statbuf)
 	 */
 	if (stat64(path, statbuf) != 0) {
 		(void) fprintf(stderr, "cannot open '%s': %s\n",
-		    path, zfs_strerror(errno));
+		    path, strerror(errno));
 		return (-1);
 	}
 
 
+#ifdef HAVE_SETMNTENT
+	if ((fp = setmntent(MNTTAB, "re")) == NULL) {
+#else
 	if ((fp = fopen(MNTTAB, "re")) == NULL) {
+#endif
 		(void) fprintf(stderr, "cannot open %s\n", MNTTAB);
 		return (-1);
 	}
@@ -138,7 +141,7 @@ getextmntent(const char *path, struct extmnttab *entry, struct stat64 *statbuf)
 	 */
 
 	match = 0;
-	while (getextmntent_impl(fp, entry) == 0) {
+	while (getextmntent_impl(fp, entry, sizeof (*entry)) == 0) {
 		if (makedev(entry->mnt_major, entry->mnt_minor) ==
 		    statbuf->st_dev) {
 			match = 1;

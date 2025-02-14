@@ -1,6 +1,17 @@
-libunicode_la_CFLAGS = $(AM_CFLAGS) $(KERNEL_CFLAGS) $(LIBRARY_CFLAGS)
+include $(top_srcdir)/config/Rules.am
 
-noinst_LTLIBRARIES += libunicode.la
+VPATH = $(top_srcdir)/module/unicode
+
+# Includes kernel code, generate warnings for large stack frames
+AM_CFLAGS += $(FRAME_LARGER_THAN)
+
+noinst_LTLIBRARIES = libunicode.la
+
+KERNEL_C = \
+	u8_textprep.c \
+	uconv.c
 
 nodist_libunicode_la_SOURCES = \
-	module/unicode/u8_textprep.c
+	$(KERNEL_C)
+
+include $(top_srcdir)/config/CppCheck.am

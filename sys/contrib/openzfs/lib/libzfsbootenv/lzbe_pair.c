@@ -293,8 +293,7 @@ lzbe_add_pair(void *ptr, const char *key, const char *type, void *value,
 		break;
 
 	case DATA_TYPE_NVLIST_ARRAY:
-		rv = nvlist_add_nvlist_array(nv, key, (const nvlist_t **)value,
-		    size);
+		rv = nvlist_add_nvlist_array(nv, key, value, size);
 		break;
 
 	case DATA_TYPE_BOOLEAN_VALUE:

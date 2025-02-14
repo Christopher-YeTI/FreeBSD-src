@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -52,7 +52,6 @@ struct zthr;
 #define	DD_FIELD_SNAPSHOT_COUNT		"com.joyent:snapshot_count"
 #define	DD_FIELD_CRYPTO_KEY_OBJ		"com.datto:crypto_key_obj"
 #define	DD_FIELD_LIVELIST		"com.delphix:livelist"
-#define	DD_FIELD_SNAPSHOTS_CHANGED	"com.ixsystems:snapshots_changed"
 
 typedef enum dd_used {
 	DD_USED_HEAD,
@@ -116,7 +115,7 @@ struct dsl_dir {
 	/* gross estimate of space used by in-flight tx's */
 	uint64_t dd_tempreserved[TXG_SIZE];
 	/* amount of space we expect to write; == amount of dirty data */
-	uint64_t dd_space_towrite[TXG_SIZE];
+	int64_t dd_space_towrite[TXG_SIZE];
 
 	dsl_deadlist_t dd_livelist;
 	bplist_t dd_pending_frees;
@@ -137,12 +136,12 @@ dsl_dir_phys(dsl_dir_t *dd)
 	return (dd->dd_dbuf->db_data);
 }
 
-void dsl_dir_rele(dsl_dir_t *dd, const void *tag);
-void dsl_dir_async_rele(dsl_dir_t *dd, const void *tag);
-int dsl_dir_hold(dsl_pool_t *dp, const char *name, const void *tag,
+void dsl_dir_rele(dsl_dir_t *dd, void *tag);
+void dsl_dir_async_rele(dsl_dir_t *dd, void *tag);
+int dsl_dir_hold(dsl_pool_t *dp, const char *name, void *tag,
     dsl_dir_t **, const char **tail);
 int dsl_dir_hold_obj(dsl_pool_t *dp, uint64_t ddobj,
-    const char *tail, const void *tag, dsl_dir_t **);
+    const char *tail, void *tag, dsl_dir_t **);
 void dsl_dir_name(dsl_dir_t *dd, char *buf);
 int dsl_dir_namelen(dsl_dir_t *dd);
 uint64_t dsl_dir_create_sync(dsl_pool_t *dp, dsl_dir_t *pds,
@@ -192,13 +191,13 @@ int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd,
 boolean_t dsl_dir_is_clone(dsl_dir_t *dd);
 void dsl_dir_new_refreservation(dsl_dir_t *dd, struct dsl_dataset *ds,
     uint64_t reservation, cred_t *cr, dmu_tx_t *tx);
-void dsl_dir_snap_cmtime_update(dsl_dir_t *dd, dmu_tx_t *tx);
+void dsl_dir_snap_cmtime_update(dsl_dir_t *dd);
 inode_timespec_t dsl_dir_snap_cmtime(dsl_dir_t *dd);
 void dsl_dir_set_reservation_sync_impl(dsl_dir_t *dd, uint64_t value,
     dmu_tx_t *tx);
 void dsl_dir_zapify(dsl_dir_t *dd, dmu_tx_t *tx);
 boolean_t dsl_dir_is_zapified(dsl_dir_t *dd);
-int dsl_dir_livelist_open(dsl_dir_t *dd, uint64_t obj);
+void dsl_dir_livelist_open(dsl_dir_t *dd, uint64_t obj);
 void dsl_dir_livelist_close(dsl_dir_t *dd);
 void dsl_dir_remove_livelist(dsl_dir_t *dd, dmu_tx_t *tx, boolean_t total);
 int dsl_dir_wait(dsl_dir_t *dd, dsl_dataset_t *ds, zfs_wait_activity_t activity,
@@ -219,7 +218,7 @@ void dsl_dir_cancel_waiters(dsl_dir_t *dd);
 	dprintf("dd=%s " fmt, __ds_name, __VA_ARGS__); \
 	kmem_free(__ds_name, ZFS_MAX_DATASET_NAME_LEN); \
 	} \
-} while (0)
+_NOTE(CONSTCOND) } while (0)
 #else
 #define	dprintf_dd(dd, fmt, ...)
 #endif

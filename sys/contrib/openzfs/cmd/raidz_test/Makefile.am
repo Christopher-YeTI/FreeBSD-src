@@ -1,16 +1,22 @@
-raidz_test_CFLAGS   = $(AM_CFLAGS)   $(KERNEL_CFLAGS)
-raidz_test_CPPFLAGS = $(AM_CPPFLAGS) $(LIBZPOOL_CPPFLAGS)
+include $(top_srcdir)/config/Rules.am
 
-bin_PROGRAMS    += raidz_test
-CPPCHECKTARGETS += raidz_test
+# Includes kernel code, generate warnings for large stack frames
+AM_CFLAGS += $(FRAME_LARGER_THAN)
+
+# Unconditionally enable ASSERTs
+AM_CPPFLAGS += -DDEBUG -UNDEBUG -DZFS_DEBUG
+
+bin_PROGRAMS = raidz_test
 
 raidz_test_SOURCES = \
-	%D%/raidz_bench.c \
-	%D%/raidz_test.c \
-	%D%/raidz_test.h
+	raidz_test.h \
+	raidz_test.c \
+	raidz_bench.c
 
 raidz_test_LDADD = \
-	libzpool.la \
-	libzfs_core.la
+	$(abs_top_builddir)/lib/libzpool/libzpool.la \
+	$(abs_top_builddir)/lib/libzfs_core/libzfs_core.la
 
 raidz_test_LDADD += -lm
+
+include $(top_srcdir)/config/CppCheck.am

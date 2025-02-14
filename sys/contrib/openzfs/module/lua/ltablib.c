@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: ltablib.c,v 1.65.1.2 2014/05/07 16:32:55 roberto Exp $
 ** Library for Table Manipulation
@@ -285,3 +286,4 @@ LUAMOD_API int luaopen_table (lua_State *L) {
 EXPORT_SYMBOL(luaopen_table);
 
 #endif
+/* END CSTYLED */

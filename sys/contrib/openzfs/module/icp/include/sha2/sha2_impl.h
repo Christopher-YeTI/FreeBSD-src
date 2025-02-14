@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -18,10 +18,9 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright (c) 2009 Sun Microsystems, Inc.  All rights reserved.
- * Copyright (c) 2022 Tino Reichardt <milky-zfs@mcmilk.de>
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SHA2_IMPL_H
@@ -32,28 +31,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* transform function definition */
-typedef void (*sha256_f)(uint32_t state[8], const void *data, size_t blks);
-typedef void (*sha512_f)(uint64_t state[8], const void *data, size_t blks);
-
-/* needed for checking valid implementations */
-typedef boolean_t (*sha2_is_supported_f)(void);
-
-typedef struct {
-	const char *name;
-	sha256_f transform;
-	sha2_is_supported_f is_supported;
-} sha256_ops_t;
-
-typedef struct {
-	const char *name;
-	sha512_f transform;
-	sha2_is_supported_f is_supported;
-} sha512_ops_t;
-
-extern const sha256_ops_t *sha256_get_ops(void);
-extern const sha512_ops_t *sha512_get_ops(void);
 
 typedef enum {
 	SHA1_TYPE,

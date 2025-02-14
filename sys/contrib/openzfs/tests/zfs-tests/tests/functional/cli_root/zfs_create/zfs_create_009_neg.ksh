@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -62,7 +62,8 @@ function cleanup
 	# check to see if there is any new fs created during the test
 	# if so destroy it.
 	#
-	for dset in $(zfs list -H | awk '$1 ~ /\/ {print $1}'); do
+	for dset in $(zfs list -H | \
+		awk '{print $1}' | grep / ); do
 		found=false
 		i=0
 		while (( $i < ${#existed_fs[*]} )); do
@@ -98,7 +99,7 @@ log_assert "Verify 'zfs create <filesystem>' fails with bad <filesystem> argumen
 datasetexists $TESTPOOL/$TESTFS || \
 	log_must zfs create $TESTPOOL/$TESTFS
 
-set -A existed_fs $(zfs list -H | awk '$1 ~ /\// {print $1}')
+set -A existed_fs $(zfs list -H | awk '{print $1}' | grep / )
 
 log_mustnot zfs create $TESTPOOL
 log_mustnot zfs create $TESTPOOL/$TESTFS

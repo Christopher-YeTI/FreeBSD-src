@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -53,7 +53,7 @@ int zfs_file_pread(zfs_file_t *fp, void *buf, size_t len, loff_t off,
 int zfs_file_seek(zfs_file_t *fp, loff_t *offp, int whence);
 int zfs_file_getattr(zfs_file_t *fp, zfs_file_attr_t *zfattr);
 int zfs_file_fsync(zfs_file_t *fp, int flags);
-int zfs_file_deallocate(zfs_file_t *fp, loff_t offset, loff_t len);
+int zfs_file_fallocate(zfs_file_t *fp, int mode, loff_t offset, loff_t len);
 loff_t zfs_file_off(zfs_file_t *fp);
 int zfs_file_unlink(const char *);
 

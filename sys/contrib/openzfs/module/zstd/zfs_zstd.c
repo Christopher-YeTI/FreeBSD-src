@@ -48,19 +48,9 @@
 
 #define	ZSTD_STATIC_LINKING_ONLY
 #include "lib/zstd.h"
-#include "lib/common/zstd_errors.h"
+#include "lib/zstd_errors.h"
 
-#ifndef IN_LIBSA
-static uint_t zstd_earlyabort_pass = 1;
-static int zstd_cutoff_level = ZIO_ZSTD_LEVEL_3;
-static unsigned int zstd_abort_size = (128 * 1024);
-#endif
-
-#ifdef IN_BASE
-int zfs_zstd_decompress_buf(void *, void *, size_t, size_t, int);
-#endif
-
-static kstat_t *zstd_ksp = NULL;
+kstat_t *zstd_ksp = NULL;
 
 typedef struct zstd_stats {
 	kstat_named_t	zstd_stat_alloc_fail;
@@ -72,21 +62,6 @@ typedef struct zstd_stats {
 	kstat_named_t	zstd_stat_dec_header_inval;
 	kstat_named_t	zstd_stat_com_fail;
 	kstat_named_t	zstd_stat_dec_fail;
-	/*
-	 * LZ4 first-pass early abort verdict
-	 */
-	kstat_named_t	zstd_stat_lz4pass_allowed;
-	kstat_named_t	zstd_stat_lz4pass_rejected;
-	/*
-	 * zstd-1 second-pass early abort verdict
-	 */
-	kstat_named_t	zstd_stat_zstdpass_allowed;
-	kstat_named_t	zstd_stat_zstdpass_rejected;
-	/*
-	 * We excluded this from early abort for some reason
-	 */
-	kstat_named_t	zstd_stat_passignored;
-	kstat_named_t	zstd_stat_passignored_size;
 	kstat_named_t	zstd_stat_buffers;
 	kstat_named_t	zstd_stat_size;
 } zstd_stats_t;
@@ -101,43 +76,9 @@ static zstd_stats_t zstd_stats = {
 	{ "decompress_header_invalid",	KSTAT_DATA_UINT64 },
 	{ "compress_failed",		KSTAT_DATA_UINT64 },
 	{ "decompress_failed",		KSTAT_DATA_UINT64 },
-	{ "lz4pass_allowed",		KSTAT_DATA_UINT64 },
-	{ "lz4pass_rejected",		KSTAT_DATA_UINT64 },
-	{ "zstdpass_allowed",		KSTAT_DATA_UINT64 },
-	{ "zstdpass_rejected",		KSTAT_DATA_UINT64 },
-	{ "passignored",		KSTAT_DATA_UINT64 },
-	{ "passignored_size",		KSTAT_DATA_UINT64 },
 	{ "buffers",			KSTAT_DATA_UINT64 },
 	{ "size",			KSTAT_DATA_UINT64 },
 };
-
-#ifdef _KERNEL
-static int
-kstat_zstd_update(kstat_t *ksp, int rw)
-{
-	ASSERT(ksp != NULL);
-
-	if (rw == KSTAT_WRITE && ksp == zstd_ksp) {
-		ZSTDSTAT_ZERO(zstd_stat_alloc_fail);
-		ZSTDSTAT_ZERO(zstd_stat_alloc_fallback);
-		ZSTDSTAT_ZERO(zstd_stat_com_alloc_fail);
-		ZSTDSTAT_ZERO(zstd_stat_dec_alloc_fail);
-		ZSTDSTAT_ZERO(zstd_stat_com_inval);
-		ZSTDSTAT_ZERO(zstd_stat_dec_inval);
-		ZSTDSTAT_ZERO(zstd_stat_dec_header_inval);
-		ZSTDSTAT_ZERO(zstd_stat_com_fail);
-		ZSTDSTAT_ZERO(zstd_stat_dec_fail);
-		ZSTDSTAT_ZERO(zstd_stat_lz4pass_allowed);
-		ZSTDSTAT_ZERO(zstd_stat_lz4pass_rejected);
-		ZSTDSTAT_ZERO(zstd_stat_zstdpass_allowed);
-		ZSTDSTAT_ZERO(zstd_stat_zstdpass_rejected);
-		ZSTDSTAT_ZERO(zstd_stat_passignored);
-		ZSTDSTAT_ZERO(zstd_stat_passignored_size);
-	}
-
-	return (0);
-}
-#endif
 
 /* Enums describing the allocator type specified by kmem_type in zstd_kmem */
 enum zstd_kmem_type {
@@ -186,20 +127,16 @@ struct zstd_levelmap {
  *
  * The ZSTD handlers were split up for the most simplified implementation.
  */
-#ifndef IN_LIBSA
 static void *zstd_alloc(void *opaque, size_t size);
-#endif
 static void *zstd_dctx_alloc(void *opaque, size_t size);
 static void zstd_free(void *opaque, void *ptr);
 
-#ifndef IN_LIBSA
 /* Compression memory handler */
 static const ZSTD_customMem zstd_malloc = {
 	zstd_alloc,
 	zstd_free,
 	NULL,
 };
-#endif
 
 /* Decompression memory handler */
 static const ZSTD_customMem zstd_dctx_malloc = {
@@ -270,7 +207,11 @@ static struct zstd_pool *zstd_mempool_dctx;
  * and while ASAN does this, KASAN defines that and does not. So to avoid
  * changing the external code, we do this.
  */
-#if defined(ZFS_ASAN_ENABLED)
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define	ADDRESS_SANITIZER 1
+#endif
+#elif defined(__SANITIZE_ADDRESS__)
 #define	ADDRESS_SANITIZER 1
 #endif
 #if defined(_KERNEL) && defined(ADDRESS_SANITIZER)
@@ -439,68 +380,9 @@ zstd_enum_to_level(enum zio_zstd_levels level, int16_t *zstd_level)
 	return (1);
 }
 
-#ifndef IN_LIBSA
-static size_t
-zfs_zstd_compress_wrap(void *s_start, void *d_start, size_t s_len, size_t d_len,
-    int level)
-{
-	int16_t zstd_level;
-	if (zstd_enum_to_level(level, &zstd_level)) {
-		ZSTDSTAT_BUMP(zstd_stat_com_inval);
-		return (s_len);
-	}
-	/*
-	 * A zstd early abort heuristic.
-	 *
-	 * - Zeroth, if this is <= zstd-3, or < zstd_abort_size (currently
-	 *   128k), don't try any of this, just go.
-	 *   (because experimentally that was a reasonable cutoff for a perf win
-	 *   with tiny ratio change)
-	 * - First, we try LZ4 compression, and if it doesn't early abort, we
-	 *   jump directly to whatever compression level we intended to try.
-	 * - Second, we try zstd-1 - if that errors out (usually, but not
-	 *   exclusively, if it would overflow), we give up early.
-	 *
-	 *   If it works, instead we go on and compress anyway.
-	 *
-	 * Why two passes? LZ4 alone gets you a lot of the way, but on highly
-	 * compressible data, it was losing up to 8.5% of the compressed
-	 * savings versus no early abort, and all the zstd-fast levels are
-	 * worse indications on their own than LZ4, and don't improve the LZ4
-	 * pass noticably if stacked like this.
-	 */
-	size_t actual_abort_size = zstd_abort_size;
-	if (zstd_earlyabort_pass > 0 && zstd_level >= zstd_cutoff_level &&
-	    s_len >= actual_abort_size) {
-		int pass_len = 1;
-		pass_len = zfs_lz4_compress(s_start, d_start, s_len, d_len, 0);
-		if (pass_len < d_len) {
-			ZSTDSTAT_BUMP(zstd_stat_lz4pass_allowed);
-			goto keep_trying;
-		}
-		ZSTDSTAT_BUMP(zstd_stat_lz4pass_rejected);
-
-		pass_len = zfs_zstd_compress(s_start, d_start, s_len, d_len,
-		    ZIO_ZSTD_LEVEL_1);
-		if (pass_len == s_len || pass_len <= 0 || pass_len > d_len) {
-			ZSTDSTAT_BUMP(zstd_stat_zstdpass_rejected);
-			return (s_len);
-		}
-		ZSTDSTAT_BUMP(zstd_stat_zstdpass_allowed);
-	} else {
-		ZSTDSTAT_BUMP(zstd_stat_passignored);
-		if (s_len < actual_abort_size) {
-			ZSTDSTAT_BUMP(zstd_stat_passignored_size);
-		}
-	}
-keep_trying:
-	return (zfs_zstd_compress(s_start, d_start, s_len, d_len, level));
-
-}
-
 /* Compress block using zstd */
-static size_t
-zfs_zstd_compress_impl(void *s_start, void *d_start, size_t s_len, size_t d_len,
+size_t
+zfs_zstd_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
     int level)
 {
 	size_t c_len;
@@ -558,10 +440,8 @@ zfs_zstd_compress_impl(void *s_start, void *d_start, size_t s_len, size_t d_len,
 		 * too small, that is not a failure. Everything else is a
 		 * failure, so increment the compression failure counter.
 		 */
-		int err = ZSTD_getErrorCode(c_len);
-		if (err != ZSTD_error_dstSize_tooSmall) {
+		if (ZSTD_getErrorCode(c_len) != ZSTD_error_dstSize_tooSmall) {
 			ZSTDSTAT_BUMP(zstd_stat_com_fail);
-			dprintf("Error: %s", ZSTD_getErrorString(err));
 		}
 		return (s_len);
 	}
@@ -597,80 +477,16 @@ zfs_zstd_compress_impl(void *s_start, void *d_start, size_t s_len, size_t d_len,
 	 * As soon as such incompatibility occurs, handling code needs to be
 	 * added, differentiating between the versions.
 	 */
-	zfs_set_hdrversion(hdr, ZSTD_VERSION_NUMBER);
-	zfs_set_hdrlevel(hdr, level);
+	hdr->version = ZSTD_VERSION_NUMBER;
+	hdr->level = level;
 	hdr->raw_version_level = BE_32(hdr->raw_version_level);
 
 	return (c_len + sizeof (*hdr));
 }
 
-static size_t
-zfs_zstd_compress_buf(void *s_start, void *d_start, size_t s_len, size_t d_len,
-    int level)
-{
-	int16_t zstd_level;
-	if (zstd_enum_to_level(level, &zstd_level)) {
-		ZSTDSTAT_BUMP(zstd_stat_com_inval);
-		return (s_len);
-	}
-	/*
-	 * A zstd early abort heuristic.
-	 *
-	 * - Zeroth, if this is <= zstd-3, or < zstd_abort_size (currently
-	 *   128k), don't try any of this, just go.
-	 *   (because experimentally that was a reasonable cutoff for a perf win
-	 *   with tiny ratio change)
-	 * - First, we try LZ4 compression, and if it doesn't early abort, we
-	 *   jump directly to whatever compression level we intended to try.
-	 * - Second, we try zstd-1 - if that errors out (usually, but not
-	 *   exclusively, if it would overflow), we give up early.
-	 *
-	 *   If it works, instead we go on and compress anyway.
-	 *
-	 * Why two passes? LZ4 alone gets you a lot of the way, but on highly
-	 * compressible data, it was losing up to 8.5% of the compressed
-	 * savings versus no early abort, and all the zstd-fast levels are
-	 * worse indications on their own than LZ4, and don't improve the LZ4
-	 * pass noticably if stacked like this.
-	 */
-	size_t actual_abort_size = zstd_abort_size;
-	if (zstd_earlyabort_pass > 0 && zstd_level >= zstd_cutoff_level &&
-	    s_len >= actual_abort_size) {
-		int pass_len = 1;
-		abd_t sabd, dabd;
-		abd_get_from_buf_struct(&sabd, s_start, s_len);
-		abd_get_from_buf_struct(&dabd, d_start, d_len);
-		pass_len = zfs_lz4_compress(&sabd, &dabd, s_len, d_len, 0);
-		abd_free(&dabd);
-		abd_free(&sabd);
-		if (pass_len < d_len) {
-			ZSTDSTAT_BUMP(zstd_stat_lz4pass_allowed);
-			goto keep_trying;
-		}
-		ZSTDSTAT_BUMP(zstd_stat_lz4pass_rejected);
-
-		pass_len = zfs_zstd_compress_impl(s_start, d_start, s_len,
-		    d_len, ZIO_ZSTD_LEVEL_1);
-		if (pass_len == s_len || pass_len <= 0 || pass_len > d_len) {
-			ZSTDSTAT_BUMP(zstd_stat_zstdpass_rejected);
-			return (s_len);
-		}
-		ZSTDSTAT_BUMP(zstd_stat_zstdpass_allowed);
-	} else {
-		ZSTDSTAT_BUMP(zstd_stat_passignored);
-		if (s_len < actual_abort_size) {
-			ZSTDSTAT_BUMP(zstd_stat_passignored_size);
-		}
-	}
-keep_trying:
-	return (zfs_zstd_compress_impl(s_start, d_start, s_len, d_len, level));
-
-}
-#endif
-
 /* Decompress block using zstd and return its stored level */
-static int
-zfs_zstd_decompress_level_buf(void *s_start, void *d_start, size_t s_len,
+int
+zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
     size_t d_len, uint8_t *level)
 {
 	ZSTD_DCtx *dctx;
@@ -688,7 +504,6 @@ zfs_zstd_decompress_level_buf(void *s_start, void *d_start, size_t s_len,
 	 * not modify the original data that may be used again later.
 	 */
 	hdr_copy.raw_version_level = BE_32(hdr->raw_version_level);
-	uint8_t curlevel = zfs_get_hdrlevel(&hdr_copy);
 
 	/*
 	 * NOTE: We ignore the ZSTD version for now. As soon as any
@@ -701,13 +516,13 @@ zfs_zstd_decompress_level_buf(void *s_start, void *d_start, size_t s_len,
 	 * An invalid level is a strong indicator for data corruption! In such
 	 * case return an error so the upper layers can try to fix it.
 	 */
-	if (zstd_enum_to_level(curlevel, &zstd_level)) {
+	if (zstd_enum_to_level(hdr_copy.level, &zstd_level)) {
 		ZSTDSTAT_BUMP(zstd_stat_dec_inval);
 		return (1);
 	}
 
 	ASSERT3U(d_len, >=, s_len);
-	ASSERT3U(curlevel, !=, ZIO_COMPLEVEL_INHERIT);
+	ASSERT3U(hdr_copy.level, !=, ZIO_COMPLEVEL_INHERIT);
 
 	/* Invalid compressed buffer size encoded at start */
 	if (c_len + sizeof (*hdr) > s_len) {
@@ -738,37 +553,21 @@ zfs_zstd_decompress_level_buf(void *s_start, void *d_start, size_t s_len,
 	}
 
 	if (level) {
-		*level = curlevel;
+		*level = hdr_copy.level;
 	}
 
 	return (0);
 }
 
 /* Decompress datablock using zstd */
-#ifdef IN_BASE
 int
-zfs_zstd_decompress_buf(void *s_start, void *d_start, size_t s_len,
-    size_t d_len, int level __maybe_unused)
+zfs_zstd_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len,
+    int level __maybe_unused)
 {
 
-	return (zfs_zstd_decompress_level_buf(s_start, d_start, s_len, d_len,
+	return (zfs_zstd_decompress_level(s_start, d_start, s_len, d_len,
 	    NULL));
 }
-#else
-static int
-zfs_zstd_decompress_buf(void *s_start, void *d_start, size_t s_len,
-    size_t d_len, int level __maybe_unused)
-{
-
-	return (zfs_zstd_decompress_level_buf(s_start, d_start, s_len, d_len,
-	    NULL));
-}
-#endif
-
-#ifndef IN_LIBSA
-ZFS_COMPRESS_WRAP_DECL(zfs_zstd_compress)
-ZFS_DECOMPRESS_WRAP_DECL(zfs_zstd_decompress)
-ZFS_DECOMPRESS_LEVEL_WRAP_DECL(zfs_zstd_decompress_level)
 
 /* Allocator for zstd compression context using mempool_allocator */
 static void *
@@ -787,7 +586,6 @@ zstd_alloc(void *opaque __maybe_unused, size_t size)
 	return ((void*)z + (sizeof (struct zstd_kmem)));
 }
 
-#endif
 /*
  * Allocator for zstd decompression context using mempool_allocator with
  * fallback to reserved memory if allocation fails
@@ -875,9 +673,9 @@ create_fallback_mem(struct zstd_fallback_mem *mem, size_t size)
 static void __init
 zstd_mempool_init(void)
 {
-	zstd_mempool_cctx =
+	zstd_mempool_cctx = (struct zstd_pool *)
 	    kmem_zalloc(ZSTD_POOL_MAX * sizeof (struct zstd_pool), KM_SLEEP);
-	zstd_mempool_dctx =
+	zstd_mempool_dctx = (struct zstd_pool *)
 	    kmem_zalloc(ZSTD_POOL_MAX * sizeof (struct zstd_pool), KM_SLEEP);
 
 	for (int i = 0; i < ZSTD_POOL_MAX; i++) {
@@ -906,7 +704,7 @@ zstd_meminit(void)
 }
 
 /* Release object from pool and free memory */
-static void
+static void __exit
 release_pool(struct zstd_pool *pool)
 {
 	mutex_destroy(&pool->barrier);
@@ -916,7 +714,7 @@ release_pool(struct zstd_pool *pool)
 }
 
 /* Release memory pool objects */
-static void
+static void __exit
 zstd_mempool_deinit(void)
 {
 	for (int i = 0; i < ZSTD_POOL_MAX; i++) {
@@ -935,13 +733,6 @@ zstd_mempool_deinit(void)
 void
 zfs_zstd_cache_reap_now(void)
 {
-
-	/*
-	 * Short-circuit if there are no buffers to begin with.
-	 */
-	if (ZSTDSTAT(zstd_stat_buffers) == 0)
-		return;
-
 	/*
 	 * calling alloc with zero size seeks
 	 * and releases old unused objects
@@ -964,15 +755,12 @@ zstd_init(void)
 	if (zstd_ksp != NULL) {
 		zstd_ksp->ks_data = &zstd_stats;
 		kstat_install(zstd_ksp);
-#ifdef _KERNEL
-		zstd_ksp->ks_update = kstat_zstd_update;
-#endif
 	}
 
 	return (0);
 }
 
-extern void
+extern void __exit
 zstd_fini(void)
 {
 	/* Deinitialize kstat */
@@ -990,13 +778,15 @@ zstd_fini(void)
 }
 
 #if defined(_KERNEL)
-#ifdef __FreeBSD__
 module_init(zstd_init);
 module_exit(zstd_fini);
-#endif
 
-ZFS_MODULE_PARAM(zfs, zstd_, earlyabort_pass, UINT, ZMOD_RW,
-	"Enable early abort attempts when using zstd");
-ZFS_MODULE_PARAM(zfs, zstd_, abort_size, UINT, ZMOD_RW,
-	"Minimal size of block to attempt early abort");
+ZFS_MODULE_DESCRIPTION("ZSTD Compression for ZFS");
+ZFS_MODULE_LICENSE("Dual BSD/GPL");
+ZFS_MODULE_VERSION(ZSTD_VERSION_STRING);
+
+EXPORT_SYMBOL(zfs_zstd_compress);
+EXPORT_SYMBOL(zfs_zstd_decompress_level);
+EXPORT_SYMBOL(zfs_zstd_decompress);
+EXPORT_SYMBOL(zfs_zstd_cache_reap_now);
 #endif

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -68,9 +68,9 @@
 #include <sys/condvar.h>
 #include <sys/zfs_ioctl.h>
 
-static uint_t zfs_zevent_len_max = 512;
+int zfs_zevent_len_max = 512;
 
-static uint_t zevent_len_cur = 0;
+static int zevent_len_cur = 0;
 static int zevent_waiters = 0;
 static int zevent_flags = 0;
 
@@ -148,7 +148,8 @@ zfs_zevent_drain(zevent_t *ev)
 	list_remove(&zevent_list, ev);
 
 	/* Remove references to this event in all private file data */
-	while ((ze = list_remove_head(&ev->ev_ze_list)) != NULL) {
+	while ((ze = list_head(&ev->ev_ze_list)) != NULL) {
+		list_remove(&ev->ev_ze_list, ze);
 		ze->ze_zevent = NULL;
 		ze->ze_dropped++;
 	}
@@ -157,7 +158,7 @@ zfs_zevent_drain(zevent_t *ev)
 }
 
 void
-zfs_zevent_drain_all(uint_t *count)
+zfs_zevent_drain_all(int *count)
 {
 	zevent_t *ev;
 
@@ -379,7 +380,8 @@ zfs_zevent_wait(zfs_zevent_t *ze)
 			break;
 		}
 
-		if (cv_wait_sig(&zevent_cv, &zevent_lock) == 0) {
+		error = cv_wait_sig(&zevent_cv, &zevent_lock);
+		if (signal_pending(current)) {
 			error = SET_ERROR(EINTR);
 			break;
 		} else if (!list_is_empty(&zevent_list)) {
@@ -481,21 +483,21 @@ zfs_zevent_destroy(zfs_zevent_t *ze)
 /*
  * Wrappers for FM nvlist allocators
  */
+/* ARGSUSED */
 static void *
 i_fm_alloc(nv_alloc_t *nva, size_t size)
 {
-	(void) nva;
-	return (kmem_alloc(size, KM_SLEEP));
+	return (kmem_zalloc(size, KM_SLEEP));
 }
 
+/* ARGSUSED */
 static void
 i_fm_free(nv_alloc_t *nva, void *buf, size_t size)
 {
-	(void) nva;
 	kmem_free(buf, size);
 }
 
-static const nv_alloc_ops_t fm_mem_alloc_ops = {
+const nv_alloc_ops_t fm_mem_alloc_ops = {
 	.nv_ao_init = NULL,
 	.nv_ao_fini = NULL,
 	.nv_ao_alloc = i_fm_alloc,
@@ -700,7 +702,7 @@ i_fm_payload_set(nvlist_t *payload, const char *name, va_list ap)
 		case DATA_TYPE_STRING_ARRAY:
 			nelem = va_arg(ap, int);
 			ret = nvlist_add_string_array(payload, name,
-			    va_arg(ap, const char **), nelem);
+			    va_arg(ap, char **), nelem);
 			break;
 		case DATA_TYPE_NVLIST:
 			ret = nvlist_add_nvlist(payload, name,
@@ -709,7 +711,7 @@ i_fm_payload_set(nvlist_t *payload, const char *name, va_list ap)
 		case DATA_TYPE_NVLIST_ARRAY:
 			nelem = va_arg(ap, int);
 			ret = nvlist_add_nvlist_array(payload, name,
-			    va_arg(ap, const nvlist_t **), nelem);
+			    va_arg(ap, nvlist_t **), nelem);
 			break;
 		default:
 			ret = EINVAL;
@@ -865,10 +867,8 @@ fm_fmri_hc_set(nvlist_t *fmri, int version, const nvlist_t *auth,
 	}
 	va_end(ap);
 
-	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST,
-	    (const nvlist_t **)pairs, npairs) != 0) {
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, pairs, npairs) != 0)
 		atomic_inc_64(&erpt_kstat_data.fmri_set_failed.value.ui64);
-	}
 
 	for (i = 0; i < npairs; i++)
 		fm_nvlist_destroy(pairs[i], FM_NVA_RETAIN);
@@ -891,7 +891,7 @@ fm_fmri_hc_create(nvlist_t *fmri, int version, const nvlist_t *auth,
 	uint_t n;
 	int i, j;
 	va_list ap;
-	const char *hcname, *hcid;
+	char *hcname, *hcid;
 
 	if (!fm_fmri_hc_set_common(fmri, version, auth))
 		return;
@@ -953,7 +953,6 @@ fm_fmri_hc_create(nvlist_t *fmri, int version, const nvlist_t *auth,
 			}
 			atomic_inc_64(
 			    &erpt_kstat_data.fmri_set_failed.value.ui64);
-			va_end(ap);
 			return;
 		}
 	}
@@ -962,8 +961,8 @@ fm_fmri_hc_create(nvlist_t *fmri, int version, const nvlist_t *auth,
 	/*
 	 * Create the fmri hc list
 	 */
-	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST,
-	    (const nvlist_t **)pairs, npairs + n) != 0) {
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, pairs,
+	    npairs + n) != 0) {
 		atomic_inc_64(&erpt_kstat_data.fmri_set_failed.value.ui64);
 		return;
 	}
@@ -1129,7 +1128,7 @@ fm_fmri_mem_set(nvlist_t *fmri, int version, const nvlist_t *auth,
 
 	if (serial != NULL) {
 		if (nvlist_add_string_array(fmri, FM_FMRI_MEM_SERIAL_ID,
-		    (const char **)&serial, 1) != 0) {
+		    (char **)&serial, 1) != 0) {
 			atomic_inc_64(
 			    &erpt_kstat_data.fmri_set_failed.value.ui64);
 		}
@@ -1341,7 +1340,7 @@ fm_init(void)
 void
 fm_fini(void)
 {
-	uint_t count;
+	int count;
 
 	zfs_ereport_fini();
 
@@ -1353,7 +1352,7 @@ fm_fini(void)
 	zevent_flags |= ZEVENT_SHUTDOWN;
 	while (zevent_waiters > 0) {
 		mutex_exit(&zevent_lock);
-		kpreempt(KPREEMPT_SYNC);
+		schedule();
 		mutex_enter(&zevent_lock);
 	}
 	mutex_exit(&zevent_lock);
@@ -1369,5 +1368,5 @@ fm_fini(void)
 }
 #endif /* _KERNEL */
 
-ZFS_MODULE_PARAM(zfs_zevent, zfs_zevent_, len_max, UINT, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_zevent, zfs_zevent_, len_max, INT, ZMOD_RW,
 	"Max event queue length");

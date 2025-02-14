@@ -39,11 +39,12 @@ log_onexit cleanup
 
 log_assert "Test colorized zpool status output"
 
-read -r _ DISK2 DISK3 _ <<<"$DISKS"
+DISK2="$(echo $DISKS | cut -d' ' -f2)"
+DISK3="$(echo $DISKS | cut -d' ' -f3)"
 
 log_must dd if=/dev/urandom of=/$TESTDIR/testfile bs=10M count=1
 
-sync_all_pools
+log_must zpool sync
 
 log_must zpool offline -f $TESTPOOL $DISK3
 log_must wait_for_degraded $TESTPOOL
@@ -61,15 +62,16 @@ log_note "$(faketty TERM=xterm-256color ZFS_COLOR=1 zpool status)"
 
 # Replace the escape codes with "ESC" so they're easier to grep
 out="$(faketty TERM=xterm-256color ZFS_COLOR=1 zpool status | \
-    sed -E '/pool:|DEGRADED/!d;s/[[:space:]]+//g;'$(printf 's/\033/ESC/g'))"
+    grep -E 'pool:|DEGRADED' | \
+    sed -r 's/[[:space:]]+//g;'$(echo -e 's/\033/ESC/g'))"
 
 log_note "$(echo $out)"
 
 log_note "Look for 'pool:' in bold"
-log_must grep -q 'ESC\[1mpool:ESC\[0m' <<<"$out"
+log_must eval "echo \"$out\" | grep -q 'ESC\[1mpool:ESC\[0m' "
 
 log_note "Look for 'DEGRADED' in yellow"
-log_must grep -q 'ESC\[0;33mDEGRADEDESC\[0m' <<<"$out"
+log_must eval "echo \"$out\" | grep -q 'ESC\[0;33mDEGRADEDESC\[0m'"
 
 #
 # The escape code for 'FAULTED' is a little more tricky.  The line starts like
@@ -81,11 +83,9 @@ log_must grep -q 'ESC\[0;33mDEGRADEDESC\[0m' <<<"$out"
 # we can easily remove the vdev field to get what we want.
 #
 out="$(faketty TERM=xterm-256color ZFS_COLOR=1 zpool status \
-    | awk '/FAULTED/ {print $1$3$4}' | sed -E $(printf 's/\033/ESC/g'))"
-
-log_note "$(echo $out)"
+    | awk '/FAULTED/{print $1$3$4}' | sed -r $(echo -e 's/\033/ESC/g'))"
 
 log_note "Look for 'FAULTED' in red"
-log_must grep -q 'ESC\[0;31mFAULTEDESC\[0m' <<<"$out"
+log_must eval "echo \"$out\" | grep -q 'ESC\[0;31mFAULTEDESC\[0m'"
 
 log_pass "zpool status displayed colors"

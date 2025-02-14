@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -46,18 +46,19 @@ verify_runnable "both"
 
 function additional_cleanup
 {
-	datasetexists $TESTPOOL/notexist && \
-		destroy_dataset $TESTPOOL/notexist -Rf
+	if datasetexists $TESTPOOL/notexist ; then
+		log_must zfs destroy -Rf $TESTPOOL/notexist
+	fi
 
-	datasetexists $TESTPOOL/$TESTFS && \
-		destroy_dataset $TESTPOOL/$TESTFS -Rf
-
+	if datasetexists $TESTPOOL/$TESTFS ; then
+		log_must zfs destroy -Rf $TESTPOOL/$TESTFS
+	fi
 	log_must zfs create $TESTPOOL/$TESTFS
 
 	if is_global_zone ; then
-		datasetexists $TESTPOOL/$TESTVOL && \
-			destroy_dataset $TESTPOOL/$TESTVOL -Rf
-
+		if datasetexists $TESTPOOL/$TESTVOL ; then
+			log_must zfs destroy -Rf $TESTPOOL/$TESTVOL
+		fi
 		log_must zfs create -V $VOLSIZE $TESTPOOL/$TESTVOL
 	fi
 }

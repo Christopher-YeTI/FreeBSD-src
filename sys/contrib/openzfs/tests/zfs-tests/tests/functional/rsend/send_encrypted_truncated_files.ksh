@@ -42,9 +42,9 @@ verify_runnable "both"
 function cleanup
 {
 	datasetexists $TESTPOOL/$TESTFS2 && \
-		destroy_dataset $TESTPOOL/$TESTFS2 -r
+		log_must zfs destroy -r $TESTPOOL/$TESTFS2
 	datasetexists $TESTPOOL/recv && \
-		destroy_dataset $TESTPOOL/recv -r
+		log_must zfs destroy -r $TESTPOOL/recv
 	[[ -f $keyfile ]] && log_must rm $keyfile
 	[[ -f $sendfile ]] && log_must rm $sendfile
 }
@@ -52,8 +52,16 @@ log_onexit cleanup
 
 function recursive_cksum
 {
-	find $1 -type f -exec xxh128sum {} + | \
-	    sort -k 2 | awk '{ print $1 }' | xxh128digest
+	case "$(uname)" in
+	FreeBSD)
+		find $1 -type f -exec sha256 -q {} \; | \
+		    sort | sha256digest
+		;;
+	*)
+		find $1 -type f -exec sha256sum {} \; | \
+		    sort -k 2 | awk '{ print $1 }' | sha256digest
+		;;
+	esac
 }
 
 log_assert "Verify 'zfs send -w' works with many different file layouts"
@@ -92,7 +100,7 @@ log_must truncate -s 131072 /$TESTPOOL/$TESTFS2/truncated
 log_must truncate -s 393216 /$TESTPOOL/$TESTFS2/truncated2
 log_must rm -f /$TESTPOOL/$TESTFS2/truncated3
 log_must rm -f /$TESTPOOL/$TESTFS2/truncated4
-sync_pool $TESTPOOL
+log_must zpool sync $TESTPOOL
 log_must zfs umount $TESTPOOL/$TESTFS2
 log_must zfs mount $TESTPOOL/$TESTFS2
 log_must dd if=/dev/urandom of=/$TESTPOOL/$TESTFS2/truncated3 \

@@ -8,14 +8,14 @@ dnl #
 AC_DEFUN([ZFS_AC_KERNEL_SRC_REVALIDATE_DISK], [
 
 	ZFS_LINUX_TEST_SRC([revalidate_disk_size], [
-		#include <linux/blkdev.h>
+		#include <linux/genhd.h>
 	], [
 		struct gendisk *disk = NULL;
 		(void) revalidate_disk_size(disk, false);
 	])
 
 	ZFS_LINUX_TEST_SRC([revalidate_disk], [
-		#include <linux/blkdev.h>
+		#include <linux/genhd.h>
 	], [
 		struct gendisk *disk = NULL;
 		(void) revalidate_disk(disk);

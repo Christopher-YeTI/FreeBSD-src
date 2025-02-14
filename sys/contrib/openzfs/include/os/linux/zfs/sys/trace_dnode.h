@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -105,10 +105,12 @@ DECLARE_EVENT_CLASS(zfs_dnode_move_class,
 );
 /* END CSTYLED */
 
+/* BEGIN CSTYLED */
 #define	DEFINE_DNODE_MOVE_EVENT(name) \
 DEFINE_EVENT(zfs_dnode_move_class, name, \
-    TP_PROTO(dnode_t *dn, int64_t refcount, uint32_t dbufs), \
-    TP_ARGS(dn, refcount, dbufs))
+	TP_PROTO(dnode_t *dn, int64_t refcount, uint32_t dbufs), \
+	TP_ARGS(dn, refcount, dbufs))
+/* END CSTYLED */
 DEFINE_DNODE_MOVE_EVENT(zfs_dnode__move);
 
 #endif /* _TRACE_DNODE_H */

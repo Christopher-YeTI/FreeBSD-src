@@ -1,20 +1,29 @@
-libzfsbootenv_la_CFLAGS  = $(AM_CFLAGS) $(LIBRARY_CFLAGS)
-libzfsbootenv_la_CFLAGS += -fvisibility=hidden
+include $(top_srcdir)/config/Rules.am
 
-lib_LTLIBRARIES += libzfsbootenv.la
-CPPCHECKTARGETS += libzfsbootenv.la
+pkgconfig_DATA = libzfsbootenv.pc
 
-libzfsbootenv_la_CPPFLAGS  = $(AM_CPPFLAGS)
-libzfsbootenv_la_CPPFLAGS += -I$(srcdir)/include/os/@ac_system_l@/zfs
+lib_LTLIBRARIES = libzfsbootenv.la
+
+include $(top_srcdir)/config/Abigail.am
+
+if BUILD_FREEBSD
+DEFAULT_INCLUDES += -I$(top_srcdir)/include/os/freebsd/zfs
+endif
+if BUILD_LINUX
+DEFAULT_INCLUDES += -I$(top_srcdir)/include/os/linux/zfs
+endif
+
+USER_C = \
+	lzbe_device.c \
+	lzbe_pair.c \
+	lzbe_util.c
 
 dist_libzfsbootenv_la_SOURCES = \
-	%D%/lzbe_device.c \
-	%D%/lzbe_pair.c \
-	%D%/lzbe_util.c
+	$(USER_C)
 
 libzfsbootenv_la_LIBADD = \
-	libzfs.la \
-	libnvpair.la
+	$(abs_top_builddir)/lib/libzfs/libzfs.la \
+	$(abs_top_builddir)/lib/libnvpair/libnvpair.la
 
 libzfsbootenv_la_LDFLAGS =
 
@@ -24,6 +33,7 @@ endif
 
 libzfsbootenv_la_LDFLAGS += -version-info 1:0:0
 
-pkgconfig_DATA += %D%/libzfsbootenv.pc
+include $(top_srcdir)/config/CppCheck.am
 
-dist_noinst_DATA += %D%/libzfsbootenv.abi %D%/libzfsbootenv.suppr
+# Library ABI
+EXTRA_DIST = libzfsbootenv.abi libzfsbootenv.suppr

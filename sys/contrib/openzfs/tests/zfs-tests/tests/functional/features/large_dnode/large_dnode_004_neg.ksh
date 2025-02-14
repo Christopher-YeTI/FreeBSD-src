@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -44,7 +44,9 @@ TEST_STREAM=$TESTDIR/ldnsnap
 
 function cleanup
 {
-	datasetexists $TEST_FS && destroy_dataset $TEST_FS -r
+	if datasetexists $TEST_FS ; then
+		log_must zfs destroy -r $TEST_FS
+	fi
 
 	if datasetexists $LGCYPOOL ; then
 		log_must zpool destroy -f $LGCYPOOL

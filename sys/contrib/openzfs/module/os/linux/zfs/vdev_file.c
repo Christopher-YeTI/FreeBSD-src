@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -33,13 +33,11 @@
 #include <sys/fs/zfs.h>
 #include <sys/fm/fs/zfs.h>
 #include <sys/abd.h>
+#include <sys/fcntl.h>
 #include <sys/vnode.h>
 #include <sys/zfs_file.h>
 #ifdef _KERNEL
 #include <linux/falloc.h>
-#include <sys/fcntl.h>
-#else
-#include <fcntl.h>
 #endif
 /*
  * Virtual device vector for files.
@@ -55,8 +53,8 @@ static taskq_t *vdev_file_taskq;
  * impact the vdev_ashift setting which can only be set at vdev creation
  * time.
  */
-static uint_t vdev_file_logical_ashift = SPA_MINBLOCKSHIFT;
-static uint_t vdev_file_physical_ashift = SPA_MINBLOCKSHIFT;
+unsigned long vdev_file_logical_ashift = SPA_MINBLOCKSHIFT;
+unsigned long vdev_file_physical_ashift = SPA_MINBLOCKSHIFT;
 
 static void
 vdev_file_hold(vdev_t *vd)
@@ -244,7 +242,7 @@ vdev_file_io_start(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	vdev_file_t *vf = vd->vdev_tsd;
 
-	if (zio->io_type == ZIO_TYPE_FLUSH) {
+	if (zio->io_type == ZIO_TYPE_IOCTL) {
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = SET_ERROR(ENXIO);
@@ -252,33 +250,44 @@ vdev_file_io_start(zio_t *zio)
 			return;
 		}
 
-		if (zfs_nocacheflush) {
-			zio_execute(zio);
-			return;
-		}
+		switch (zio->io_cmd) {
+		case DKIOCFLUSHWRITECACHE:
 
-		/*
-		 * We cannot safely call vfs_fsync() when PF_FSTRANS
-		 * is set in the current context.  Filesystems like
-		 * XFS include sanity checks to verify it is not
-		 * already set, see xfs_vm_writepage().  Therefore
-		 * the sync must be dispatched to a different context.
-		 */
-		if (__spl_pf_fstrans_check()) {
-			VERIFY3U(taskq_dispatch(vdev_file_taskq,
-			    vdev_file_io_fsync, zio, TQ_SLEEP), !=,
-			    TASKQID_INVALID);
-			return;
-		}
+			if (zfs_nocacheflush)
+				break;
 
-		zio->io_error = zfs_file_fsync(vf->vf_file, O_SYNC | O_DSYNC);
+			/*
+			 * We cannot safely call vfs_fsync() when PF_FSTRANS
+			 * is set in the current context.  Filesystems like
+			 * XFS include sanity checks to verify it is not
+			 * already set, see xfs_vm_writepage().  Therefore
+			 * the sync must be dispatched to a different context.
+			 */
+			if (__spl_pf_fstrans_check()) {
+				VERIFY3U(taskq_dispatch(vdev_file_taskq,
+				    vdev_file_io_fsync, zio, TQ_SLEEP), !=,
+				    TASKQID_INVALID);
+				return;
+			}
+
+			zio->io_error = zfs_file_fsync(vf->vf_file,
+			    O_SYNC | O_DSYNC);
+			break;
+		default:
+			zio->io_error = SET_ERROR(ENOTSUP);
+		}
 
 		zio_execute(zio);
 		return;
 	} else if (zio->io_type == ZIO_TYPE_TRIM) {
+		int mode = 0;
+
 		ASSERT3U(zio->io_size, !=, 0);
-		zio->io_error = zfs_file_deallocate(vf->vf_file,
-		    zio->io_offset, zio->io_size);
+#ifdef __linux__
+		mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
+#endif
+		zio->io_error = zfs_file_fallocate(vf->vf_file,
+		    mode, zio->io_offset, zio->io_size);
 		zio_execute(zio);
 		return;
 	}
@@ -289,10 +298,10 @@ vdev_file_io_start(zio_t *zio)
 	    TQ_SLEEP), !=, TASKQID_INVALID);
 }
 
+/* ARGSUSED */
 static void
 vdev_file_io_done(zio_t *zio)
 {
-	(void) zio;
 }
 
 vdev_ops_t vdev_file_ops = {
@@ -367,7 +376,7 @@ vdev_ops_t vdev_disk_ops = {
 
 #endif
 
-ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, logical_ashift, UINT, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, logical_ashift, ULONG, ZMOD_RW,
 	"Logical ashift for file-based devices");
-ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, physical_ashift, UINT, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, physical_ashift, ULONG, ZMOD_RW,
 	"Physical ashift for file-based devices");

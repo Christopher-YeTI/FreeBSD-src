@@ -73,7 +73,7 @@ obj=${array[0]}
 log_note "file $init_data has object number $obj"
 
 output=$(zdb -ddddddbbbbbb $TESTPOOL/$TESTFS $obj 2> /dev/null \
-    |grep -m 1 "L0 DVA")
+    |grep -m 1 "L0 DVA" |head -n1)
 dva=$(sed -Ene 's/^.+DVA\[0\]=<([^>]+)>.*$/\1/p' <<< "$output")
 log_note "block 0 of $init_data has a DVA of $dva"
 
@@ -81,28 +81,32 @@ log_note "block 0 of $init_data has a DVA of $dva"
 size_str=$(sed -Ene 's/^.+ size=([^ ]+) .*$/\1/p' <<< "$output")
 log_note "block size $size_str"
 
-IFS=: read -r vdev offset _ <<< "$dva"
-output=$(zdb -R $TESTPOOL $vdev:$offset:$size_str:d)
-echo $output | grep -q $pattern || log_fail "zdb -R :d failed to decompress the data properly"
+vdev=$(echo "$dva" |awk '{split($0,array,":")} END{print array[1]}')
+offset=$(echo "$dva" |awk '{split($0,array,":")} END{print array[2]}')
+output=$(zdb -R $TESTPOOL $vdev:$offset:$size_str:d 2> /dev/null)
+echo $output |grep $pattern > /dev/null
+(( $? != 0 )) && log_fail "zdb -R :d failed to decompress the data properly"
 
-output=$(zdb -R $TESTPOOL $vdev:$offset:$size_str:dr)
-echo $output | grep -q $four_k || log_fail "zdb -R :dr failed to decompress the data properly"
+output=$(zdb -R $TESTPOOL $vdev:$offset:$size_str:dr 2> /dev/null)
+echo $output |grep $four_k > /dev/null
+(( $? != 0 )) && log_fail "zdb -R :dr failed to decompress the data properly"
 
-output=$(zdb -R $TESTPOOL $vdev:$offset:$size_str:dr)
+output=$(zdb -R $TESTPOOL $vdev:$offset:$size_str:dr 2> /dev/null)
 result=${#output}
 (( $result != $blksize)) && log_fail \
 "zdb -R failed to decompress the data to the length (${#output} != $size_str)"
 
 # decompress using lsize
-IFS=/ read -r lsize psize _ <<< "$size_str"
-output=$(zdb -R $TESTPOOL $vdev:$offset:$lsize:dr)
+lsize=$(echo $size_str |awk '{split($0,array,"/")} END{print array[1]}')
+psize=$(echo $size_str |awk '{split($0,array,"/")} END{print array[2]}')
+output=$(zdb -R $TESTPOOL $vdev:$offset:$lsize:dr 2> /dev/null)
 result=${#output}
 (( $result != $blksize)) && log_fail \
 "zdb -R failed to decompress the data (length ${#output} != $blksize)"
 
 # Specifying psize will decompress successfully , but not always to full
 # lsize since zdb has to guess lsize incrementally.
-output=$(zdb -R $TESTPOOL $vdev:$offset:$psize:dr)
+output=$(zdb -R $TESTPOOL $vdev:$offset:$psize:dr 2> /dev/null)
 result=${#output}
 # convert psize to decimal
 psize_orig=$psize

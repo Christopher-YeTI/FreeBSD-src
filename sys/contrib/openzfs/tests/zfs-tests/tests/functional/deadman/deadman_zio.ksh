@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -83,7 +83,7 @@ log_must zinject -d $DISK1 -D10000:1 $TESTPOOL
 log_must eval "dd if=/$mntpnt/file1 of=/dev/null bs=1048576 &"
 sleep 10
 log_must zinject -c all
-sync_all_pools
+log_must zpool sync
 wait
 
 # 5. Verify a "deadman" event is posted.  The first appears after 5

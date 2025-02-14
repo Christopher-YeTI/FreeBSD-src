@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -28,7 +28,6 @@
 #include <signal.h>
 #include <errno.h>
 #include <assert.h>
-#include <limits.h>
 #include "thread_pool_impl.h"
 
 static pthread_mutex_t thread_pool_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -109,7 +108,8 @@ job_cleanup(void *arg)
 	tpool_active_t **activepp;
 
 	pthread_mutex_lock(&tpool->tp_mutex);
-	for (activepp = &tpool->tp_active; ; activepp = &activep->tpa_next) {
+	/* CSTYLED */
+	for (activepp = &tpool->tp_active;; activepp = &activep->tpa_next) {
 		activep = *activepp;
 		if (activep->tpa_tid == my_tid) {
 			*activepp = activep->tpa_next;
@@ -423,32 +423,20 @@ tpool_dispatch(tpool_t *tpool, void (*func)(void *), void *arg)
 
 	pthread_mutex_lock(&tpool->tp_mutex);
 
-	if (!(tpool->tp_flags & TP_SUSPEND)) {
-		if (tpool->tp_idle > 0)
-			(void) pthread_cond_signal(&tpool->tp_workcv);
-		else if (tpool->tp_current >= tpool->tp_maximum) {
-			/* At worker limit.  Leave task on queue */
-		} else {
-			if (create_worker(tpool) == 0) {
-				/* Started a new worker thread */
-				tpool->tp_current++;
-			} else if (tpool->tp_current > 0) {
-				/* Leave task on queue */
-			} else {
-				/* Cannot start a single worker! */
-				pthread_mutex_unlock(&tpool->tp_mutex);
-				free(job);
-				return (-1);
-			}
-		}
-	}
-
 	if (tpool->tp_head == NULL)
 		tpool->tp_head = job;
 	else
 		tpool->tp_tail->tpj_next = job;
 	tpool->tp_tail = job;
 	tpool->tp_njobs++;
+
+	if (!(tpool->tp_flags & TP_SUSPEND)) {
+		if (tpool->tp_idle > 0)
+			(void) pthread_cond_signal(&tpool->tp_workcv);
+		else if (tpool->tp_current < tpool->tp_maximum &&
+		    create_worker(tpool) == 0)
+			tpool->tp_current++;
+	}
 
 	pthread_mutex_unlock(&tpool->tp_mutex);
 	return (0);

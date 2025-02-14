@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,8 +48,11 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists $snap && destroy_dataset $snap
-	datasetexists $ctr && destroy_dataset $ctr -r
+	snapexists $snap && \
+		log_must zfs destroy $snap
+
+	datasetexists $ctr && \
+		log_must zfs destroy -r $ctr
 
 	[[ -e $origfile ]] && \
 		log_must rm -f $origfile
@@ -66,8 +69,12 @@ function do_testing # <prop> <prop_value>
 	log_must zfs set $property=$prop_val $fs
 	file_write -o create -f $origfile -b $BLOCK_SIZE -c $WRITE_COUNT
 	log_must zfs snapshot $snap
-	log_must eval "zfs send $snap > $stream"
-	log_must eval "zfs receive -d $ctr <$stream"
+	zfs send $snap > $stream
+	(( $? != 0 )) && \
+		log_fail "'zfs send' fails to create send streams."
+	zfs receive -d $ctr <$stream
+	(( $? != 0 )) && \
+		log_fail "'zfs receive' fails to receive send streams."
 
 	#verify receive result
 	! datasetexists $rstfs && \

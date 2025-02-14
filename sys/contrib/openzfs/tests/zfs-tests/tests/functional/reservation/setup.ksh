@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -32,5 +32,4 @@
 . $STF_SUITE/include/libtest.shlib
 
 default_setup_noexit ${DISKS%% *}
-log_must zfs set compression=off $TESTPOOL
 log_pass

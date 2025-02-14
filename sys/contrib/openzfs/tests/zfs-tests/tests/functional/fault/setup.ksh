@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -28,7 +28,6 @@
 
 verify_runnable "global"
 
-zed_events_drain
 zed_setup resilver_finish-start-scrub.sh
 zed_start
 

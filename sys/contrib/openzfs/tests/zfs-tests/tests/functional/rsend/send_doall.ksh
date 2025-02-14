@@ -46,7 +46,12 @@ log_must zfs create $POOL/fs/child
 
 # Create 3 files and a snapshot between each file creation.
 for i in {1..3}; do
-	log_must mkfile 16384 "/$POOL/fs/file$i" "/$POOL/fs/child/file$i"
+	file="/$POOL/fs/file$i"
+	log_must mkfile 16384 $file
+
+	file="/$POOL/fs/child/file$i"
+	log_must mkfile 16384 $file
+
 	log_must zfs snapshot -r $POOL/fs@snap$i
 done
 
@@ -54,6 +59,9 @@ done
 log_must eval "send_doall $POOL/fs@snap3 >$BACKDIR/fs@snap3"
 log_must eval "zfs recv $POOL/newfs < $BACKDIR/fs@snap3"
 
-log_mustnot datasetexists $POOL/newfs/child
+zfs list $POOL/newfs/child
+if [[ $? -eq 0 ]]; then
+	log_fail "Children dataset should not have been received"
+fi
 
 log_pass "Verify send_doall stream is correct"

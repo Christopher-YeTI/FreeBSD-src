@@ -6,7 +6,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -55,6 +55,8 @@ OLD_LEN_MAX=$(get_tunable ZEVENT_LEN_MAX)
 RETAIN_MAX=$(get_tunable ZEVENT_RETAIN_MAX)
 OLD_CHECKSUMS=$(get_tunable CHECKSUM_EVENTS_PER_SECOND)
 
+EREPORTS="$STF_SUITE/tests/functional/cli_root/zpool_events/ereports"
+
 function cleanup
 {
 	log_must set_tunable64 CHECKSUM_EVENTS_PER_SECOND $OLD_CHECKSUMS
@@ -64,7 +66,7 @@ function cleanup
 	if poolexists $POOL ; then
 		zpool export $POOL
 	fi
-	log_must rm -fd $VDEV1 $VDEV2 $VDEV3 $SUPPLY $MOUNTDIR
+	log_must rm -f $VDEV1 $VDEV2 $VDEV3
 }
 
 function damage_and_repair
@@ -76,9 +78,9 @@ function damage_and_repair
 	log_must dd conv=notrunc if=$SUPPLY of=$VDEV1 bs=1M seek=4 count=$DAMAGEBLKS
 	log_must zpool scrub $POOL
 	log_must zpool wait -t scrub $POOL
-	log_note "pass $1 observed $(ereports | grep -c checksum) checksum ereports"
+	log_note "pass $1 observed $($EREPORTS | grep -c checksum) checksum ereports"
 
-	repaired=$(zpool status $POOL | awk '/scan: scrub repaired/ {print $4}')
+	repaired=$(zpool status $POOL | grep "scan: scrub repaired" | awk '{print $4}')
 	if [ "$repaired" == "0B" ]; then
 		log_fail "INVALID TEST -- expected scrub to repair some blocks"
 	else
@@ -88,7 +90,7 @@ function damage_and_repair
 
 function checksum_error_count
 {
-	zpool status -p $POOL | awk -v dev=$VDEV1 '$0 ~ dev {print $5}'
+	zpool status -p $POOL | grep $VDEV1 | awk '{print $5}'
 }
 
 assertion="Damage to recently repaired blocks should be reported/counted"
@@ -109,7 +111,7 @@ log_must zpool create -f -m $MOUNTDIR -o failmode=continue $POOL raidz $VDEV1 $V
 log_must zfs set compression=off recordsize=16k $POOL
 # create a file full of zeros
 log_must mkfile -v $FILESIZE $FILEPATH
-sync_pool $POOL
+log_must zpool sync $POOL
 
 # run once and observe the checksum errors
 damage_and_repair 1
@@ -130,3 +132,4 @@ else
 	log_note observed $errcnt new checksum errors after a scrub
 	log_pass "$assertion"
 fi
+

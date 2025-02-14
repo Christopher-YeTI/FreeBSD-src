@@ -46,7 +46,7 @@ log_must_program $TESTPOOL - <<-EOF
 EOF
 
 log_must mkdir $dir
-sync_all_pools
+sync
 
 log_must_program $TESTPOOL - <<-EOF
 	ans, setpoint = zfs.get_prop("$fs", "written@$TESTSNAP")

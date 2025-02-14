@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -51,7 +51,7 @@ then
 	log_fail "\"zpool set\" exit status $RET should be equal to 2."
 fi
 
-zpool set 2>&1 | grep -qi usage
+OUTPUT=$(zpool set 2>&1 | grep -i usage)
 if [ $? != 0 ]
 then
 	log_fail "Usage message for zpool set did not contain the word 'usage'."

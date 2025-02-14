@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,17 +47,12 @@ function cleanup
 	done
 }
 
-unshare -Urm echo test
-if [ "$?" -ne "0" ]; then
-	log_unsupported "Failed to create user namespace"
-fi
-
 log_onexit cleanup
 
 log_assert "Check root in user namespaces"
 
-TOUCH=$(readlink -f $(command -v touch))
-CHMOD=$(readlink -f $(command -v chmod))
+TOUCH=$(readlink -e $(which touch))
+CHMOD=$(readlink -e $(which chmod))
 
 for i in ${files[*]}; do
 	log_must $TOUCH $TESTDIR/$i

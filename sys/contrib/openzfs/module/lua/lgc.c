@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lgc.c,v 2.140.1.3 2014/09/01 16:55:08 roberto Exp $
 ** Garbage Collector
@@ -675,7 +676,7 @@ static void freeobj (lua_State *L, GCObject *o) {
     case LUA_TUSERDATA: luaM_freemem(L, o, sizeudata(gco2u(o))); break;
     case LUA_TSHRSTR:
       G(L)->strt.nuse--;
-      zfs_fallthrough;
+      /* FALLTHROUGH */
     case LUA_TLNGSTR: {
       luaM_freemem(L, o, sizestring(gco2ts(o)));
       break;
@@ -1056,7 +1057,7 @@ static lu_mem singlestep (lua_State *L) {
         lu_mem work;
         int sw;
         g->gcstate = GCSatomic;  /* finish mark phase */
-        g->GCestimate = g->GCmemtrav;  /* save what was counted */
+        g->GCestimate = g->GCmemtrav;  /* save what was counted */;
         work = atomic(L);  /* add what was traversed by 'atomic' */
         g->GCestimate += work;  /* estimate of total memory traversed */
         sw = entersweep(L);
@@ -1214,3 +1215,4 @@ void luaC_fullgc (lua_State *L, int isemergency) {
 }
 
 /* }====================================================== */
+/* END CSTYLED */

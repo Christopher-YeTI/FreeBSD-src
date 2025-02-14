@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -59,7 +59,7 @@ function cleanup
 	typeset -i i=0
 	while (( $i < ${#datasets[*]} )); do
 		datasetexists ${datasets[i]} && \
-			destroy_dataset ${datasets[i]}
+			log_must zfs destroy ${datasets[i]}
 		(( i = i + 1 ))
 	done
 

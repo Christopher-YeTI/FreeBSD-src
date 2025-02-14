@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -50,7 +50,7 @@ log_assert "Verify cannot set quota lower than the space currently in use"
 
 function cleanup
 {
-	reset_quota $TESTPOOL/$TESTFS
+	log_must zfs set quota=none $TESTPOOL/$TESTFS
 }
 
 log_onexit cleanup

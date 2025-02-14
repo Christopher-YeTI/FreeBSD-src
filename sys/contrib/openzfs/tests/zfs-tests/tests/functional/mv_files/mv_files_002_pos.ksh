@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -54,7 +54,9 @@ verify_runnable "global"
 
 function cleanup
 {
-	rm -f $OLDDIR/* $NEWDIR_ACROSS_FS/*  >/dev/null 2>&1
+	PIDS=""
+	rm -f $OLDDIR/* >/dev/null 2>&1
+	rm -f $NEWDIR_ACROSS_FS/* >/dev/null 2>&1
 }
 
 log_assert "Doing a 'mv' of a large amount of files across two zfs filesystems" \
@@ -62,6 +64,8 @@ log_assert "Doing a 'mv' of a large amount of files across two zfs filesystems" 
 
 log_onexit cleanup
 
-log_must mv_test $OLDDIR $NEWDIR_ACROSS_FS
+mv_test $OLDDIR $NEWDIR_ACROSS_FS
+(($? != 0 )) && \
+        log_fail "'mv' test failed to complete."
 
 log_pass

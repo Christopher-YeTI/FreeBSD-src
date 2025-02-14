@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -111,7 +111,7 @@ log_assert "Verify that import could handle damaged or missing device."
 CWD=$PWD
 cd $DEVICE_DIR || log_fail "Unable change directory to $DEVICE_DIR"
 
-read -r checksum1 _ < <(cksum $MYTESTFILE)
+checksum1=$(sum $MYTESTFILE | awk '{print $1}')
 
 typeset -i i=0
 typeset -i j=0
@@ -199,8 +199,10 @@ while (( i < ${#vdevs[*]} )); do
 			[[ ! -e $basedir/$TESTFILE0 ]] && \
 				log_fail "$basedir/$TESTFILE0 missing after import."
 
-			read -r checksum2 _ < <(cksum $basedir/$TESTFILE0)
-			log_must [ "$checksum1" = "$checksum2" ]
+			checksum2=$(sum $basedir/$TESTFILE0 | awk '{print $1}')
+			[[ "$checksum1" != "$checksum2" ]] && \
+				log_fail "Checksums differ ($checksum1 != $checksum2)"
+
 		done
 
 		((j = j + 1))

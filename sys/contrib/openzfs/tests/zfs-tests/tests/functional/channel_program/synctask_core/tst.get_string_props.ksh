@@ -30,8 +30,8 @@ clone=$TESTPOOL/$TESTCLONE
 
 function cleanup
 {
-	datasetexists $clone && destroy_dataset $clone
-	datasetexists $fs && destroy_dataset $fs -R
+	datasetexists $clone && log_must zfs destroy $clone
+	datasetexists $fs && log_must zfs destroy -R $fs
 }
 
 log_onexit cleanup

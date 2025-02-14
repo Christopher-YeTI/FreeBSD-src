@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -55,7 +55,11 @@ function cleanup
 	#
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "online"
+		check_state $TESTPOOL $disk "online"
+		if [[ $? != 0 ]]; then
+			log_fail "Unable to online $disk"
+		fi
+
 	done
 
 	kill $killpid >/dev/null 2>&1
@@ -125,8 +129,7 @@ while [[ $i -lt ${#disks[*]} ]]; do
 done
 
 log_must kill $killpid
-sync_all_pools
-log_must sync
+sync
 
 typeset dir=$(get_device_dir $DISKS)
 verify_filesys "$TESTPOOL" "$TESTPOOL/$TESTFS" "$dir"

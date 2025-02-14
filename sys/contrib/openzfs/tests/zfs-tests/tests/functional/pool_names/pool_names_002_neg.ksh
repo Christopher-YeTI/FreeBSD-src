@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -111,9 +111,9 @@ set -A POOLNAME \
     "2222222222222222222" "mirror_pool" "raidz_pool" \
     "mirror-pool" "raidz-pool" "spare" "spare_pool" \
     "spare-pool" "raidz1-" "raidz2:" ":aaa" "-bbb" "_ccc" ".ddd"
-
-POOLNAME[${#POOLNAME[@]}]='log'
-
+if verify_slog_support ; then
+	POOLNAME[${#POOLNAME[@]}]='log'
+fi
 typeset -i i=0
 while ((i < ${#POOLNAME[@]})); do
 	log_mustnot zpool create -m $TESTDIR ${POOLNAME[$i]} $DISK

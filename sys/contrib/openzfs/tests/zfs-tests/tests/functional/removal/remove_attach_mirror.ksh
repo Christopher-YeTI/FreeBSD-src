@@ -32,8 +32,6 @@
 #	4. Reattach it to make a mirror
 #
 
-command -v fio > /dev/null || log_unsupported "fio missing"
-
 TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
 
 DISK1="$TMPDIR/dsk1"

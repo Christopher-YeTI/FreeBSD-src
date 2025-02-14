@@ -30,7 +30,7 @@ create_clone
 function cleanup
 {
 	datasetexists $TESTPOOL/$TESTFS@$TESTSNAP && \
-	    destroy_dataset $TESTPOOL/$TESTFS@$TESTSNAP -R
+	    log_must zfs destroy -R $TESTPOOL/$TESTFS@$TESTSNAP
 }
 
 log_must_program $TESTPOOL $ZCP_ROOT/lua_core/tst.exists.zcp \
@@ -38,6 +38,8 @@ log_must_program $TESTPOOL $ZCP_ROOT/lua_core/tst.exists.zcp \
     $TESTPOOL/$TESTCLONE
 
 log_mustnot_checkerror_program "not in the target pool" \
-    $TESTPOOL - <<<"return zfs.exists('rpool')"
+    $TESTPOOL - <<-EOF
+	return zfs.exists('rpool')
+EOF
 
 log_pass "zfs.exists() gives correct results"

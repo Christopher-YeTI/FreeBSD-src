@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lopcodes.h,v 1.142.1.2 2014/10/20 18:32:09 roberto Exp $
 ** Opcodes for Lua virtual machine
@@ -286,3 +287,4 @@ LUAI_DDEC const char *const luaP_opnames[NUM_OPCODES+1];  /* opcode names */
 
 
 #endif
+/* END CSTYLED */

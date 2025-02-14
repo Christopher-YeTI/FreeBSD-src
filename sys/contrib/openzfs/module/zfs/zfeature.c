@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -183,7 +183,7 @@ spa_features_check(spa_t *spa, boolean_t for_write,
 	char *buf;
 
 	zc = kmem_alloc(sizeof (zap_cursor_t), KM_SLEEP);
-	za = zap_attribute_alloc();
+	za = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
 	buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 	supported = B_TRUE;
@@ -217,7 +217,7 @@ spa_features_check(spa_t *spa, boolean_t for_write,
 	zap_cursor_fini(zc);
 
 	kmem_free(buf, MAXPATHLEN);
-	zap_attribute_free(za);
+	kmem_free(za, sizeof (zap_attribute_t));
 	kmem_free(zc, sizeof (zap_cursor_t));
 
 	return (supported);
@@ -389,13 +389,6 @@ feature_enable_sync(spa_t *spa, zfeature_info_t *feature, dmu_tx_t *tx)
 	    !spa_feature_is_active(spa, SPA_FEATURE_ENCRYPTION) &&
 	    feature->fi_feature == SPA_FEATURE_BOOKMARK_V2)
 		spa->spa_errata = 0;
-
-	/*
-	 * Convert the old on-disk error log to the new format when activating
-	 * the head_errlog feature.
-	 */
-	if (feature->fi_feature == SPA_FEATURE_HEAD_ERRLOG)
-		spa_upgrade_errlog(spa, tx);
 }
 
 static void

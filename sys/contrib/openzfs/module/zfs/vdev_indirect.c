@@ -34,7 +34,6 @@
 #include <sys/zap.h>
 #include <sys/abd.h>
 #include <sys/zthr.h>
-#include <sys/fm/fs/zfs.h>
 
 /*
  * An indirect vdev corresponds to a vdev that has been removed.  Since
@@ -49,8 +48,8 @@
  * "vdev_remap" operation that executes a callback on each contiguous
  * segment of the new location.  This function is used in multiple ways:
  *
- *  - I/Os to this vdev use the callback to determine where the
- *    data is now located, and issue child I/Os for each segment's new
+ *  - i/os to this vdev use the callback to determine where the
+ *    data is now located, and issue child i/os for each segment's new
  *    location.
  *
  *  - frees and claims to this vdev use the callback to free or claim
@@ -173,7 +172,7 @@
  * object.
  */
 
-static int zfs_condense_indirect_vdevs_enable = B_TRUE;
+int zfs_condense_indirect_vdevs_enable = B_TRUE;
 
 /*
  * Condense if at least this percent of the bytes in the mapping is
@@ -182,7 +181,7 @@ static int zfs_condense_indirect_vdevs_enable = B_TRUE;
  * condenses.  Higher values will condense less often (causing less
  * i/o); lower values will reduce the mapping size more quickly.
  */
-static uint_t zfs_condense_indirect_obsolete_pct = 25;
+int zfs_condense_indirect_obsolete_pct = 25;
 
 /*
  * Condense if the obsolete space map takes up more than this amount of
@@ -190,14 +189,14 @@ static uint_t zfs_condense_indirect_obsolete_pct = 25;
  * consumed by the obsolete space map; the default of 1GB is small enough
  * that we typically don't mind "wasting" it.
  */
-static uint64_t zfs_condense_max_obsolete_bytes = 1024 * 1024 * 1024;
+unsigned long zfs_condense_max_obsolete_bytes = 1024 * 1024 * 1024;
 
 /*
  * Don't bother condensing if the mapping uses less than this amount of
  * memory.  The default of 128KB is considered a "trivial" amount of
  * memory and not worth reducing.
  */
-static uint64_t zfs_condense_min_mapping_bytes = 128 * 1024;
+unsigned long zfs_condense_min_mapping_bytes = 128 * 1024;
 
 /*
  * This is used by the test suite so that it can ensure that certain
@@ -205,7 +204,7 @@ static uint64_t zfs_condense_min_mapping_bytes = 128 * 1024;
  * complete too quickly).  If used to reduce the performance impact of
  * condensing in production, a maximum value of 1 should be sufficient.
  */
-static uint_t zfs_condense_indirect_commit_entry_delay_ms = 0;
+int zfs_condense_indirect_commit_entry_delay_ms = 0;
 
 /*
  * If an indirect split block contains more than this many possible unique
@@ -215,7 +214,7 @@ static uint_t zfs_condense_indirect_commit_entry_delay_ms = 0;
  * copies to participate fairly in the reconstruction when all combinations
  * cannot be checked and prevents repeated use of one bad copy.
  */
-uint_t zfs_reconstruct_indirect_combinations_max = 4096;
+int zfs_reconstruct_indirect_combinations_max = 4096;
 
 /*
  * Enable to simulate damaged segments and validate reconstruction.  This
@@ -271,7 +270,7 @@ typedef struct indirect_split {
 	 */
 	indirect_child_t *is_good_child;
 
-	indirect_child_t is_child[];
+	indirect_child_t is_child[1]; /* variable-length */
 } indirect_split_t;
 
 /*
@@ -294,16 +293,17 @@ vdev_indirect_map_free(zio_t *zio)
 	indirect_vsd_t *iv = zio->io_vsd;
 
 	indirect_split_t *is;
-	while ((is = list_remove_head(&iv->iv_splits)) != NULL) {
+	while ((is = list_head(&iv->iv_splits)) != NULL) {
 		for (int c = 0; c < is->is_children; c++) {
 			indirect_child_t *ic = &is->is_child[c];
 			if (ic->ic_data != NULL)
 				abd_free(ic->ic_data);
 		}
+		list_remove(&iv->iv_splits, is);
 
 		indirect_child_t *ic;
-		while ((ic = list_remove_head(&is->is_unique_child)) != NULL)
-			;
+		while ((ic = list_head(&is->is_unique_child)) != NULL)
+			list_remove(&is->is_unique_child, ic);
 
 		list_destroy(&is->is_unique_child);
 
@@ -637,15 +637,16 @@ spa_condense_indirect_generate_new_mapping(vdev_t *vd,
 	}
 }
 
+/* ARGSUSED */
 static boolean_t
 spa_condense_indirect_thread_check(void *arg, zthr_t *zthr)
 {
-	(void) zthr;
 	spa_t *spa = arg;
 
 	return (spa->spa_condensing_indirect != NULL);
 }
 
+/* ARGSUSED */
 static void
 spa_condense_indirect_thread(void *arg, zthr_t *zthr)
 {
@@ -940,12 +941,13 @@ vdev_obsolete_counts_are_precise(vdev_t *vd, boolean_t *are_precise)
 	return (error);
 }
 
+/* ARGSUSED */
 static void
 vdev_indirect_close(vdev_t *vd)
 {
-	(void) vd;
 }
 
+/* ARGSUSED */
 static int
 vdev_indirect_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
     uint64_t *logical_ashift, uint64_t *physical_ashift)
@@ -1021,7 +1023,7 @@ vdev_indirect_mapping_duplicate_adjacent_entries(vdev_t *vd, uint64_t offset,
 
 	size_t copy_length = entries * sizeof (*first_mapping);
 	duplicate_mappings = kmem_alloc(copy_length, KM_SLEEP);
-	memcpy(duplicate_mappings, first_mapping, copy_length);
+	bcopy(first_mapping, duplicate_mappings, copy_length);
 	*copied_entries = entries;
 
 	return (duplicate_mappings);
@@ -1319,7 +1321,6 @@ vdev_indirect_io_start(zio_t *zio)
 	    vdev_indirect_gather_splits, zio);
 
 	indirect_split_t *first = list_head(&iv->iv_splits);
-	ASSERT3P(first, !=, NULL);
 	if (first->is_size == zio->io_size) {
 		/*
 		 * This is not a split block; we are pointing to the entire
@@ -1370,10 +1371,9 @@ vdev_indirect_io_start(zio_t *zio)
 			    is != NULL; is = list_next(&iv->iv_splits, is)) {
 				zio_nowait(zio_vdev_child_io(zio, NULL,
 				    is->is_vdev, is->is_target_offset,
-				    abd_get_offset_size(zio->io_abd,
-				    is->is_split_offset, is->is_size),
-				    is->is_size, zio->io_type,
-				    zio->io_priority, 0,
+				    abd_get_offset(zio->io_abd,
+				    is->is_split_offset), is->is_size,
+				    zio->io_type, zio->io_priority, 0,
 				    vdev_indirect_child_io_done, zio));
 			}
 
@@ -1399,7 +1399,7 @@ vdev_indirect_checksum_error(zio_t *zio,
 	vd->vdev_stat.vs_checksum_errors++;
 	mutex_exit(&vd->vdev_stat_lock);
 
-	zio_bad_cksum_t zbc = { 0 };
+	zio_bad_cksum_t zbc = {{{ 0 }}};
 	abd_t *bad_abd = ic->ic_data;
 	abd_t *good_abd = is->is_good_child->ic_data;
 	(void) zfs_ereport_post_checksum(zio->io_spa, vd, NULL, zio,
@@ -1424,6 +1424,11 @@ static void
 vdev_indirect_repair(zio_t *zio)
 {
 	indirect_vsd_t *iv = zio->io_vsd;
+
+	enum zio_flag flags = ZIO_FLAG_IO_REPAIR;
+
+	if (!(zio->io_flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)))
+		flags |= ZIO_FLAG_SELF_HEAL;
 
 	if (!spa_writeable(zio->io_spa))
 		return;
@@ -1480,12 +1485,12 @@ vdev_indirect_all_checksum_errors(zio_t *zio)
 
 			vdev_t *vd = ic->ic_vdev;
 
-			mutex_enter(&vd->vdev_stat_lock);
-			vd->vdev_stat.vs_checksum_errors++;
-			mutex_exit(&vd->vdev_stat_lock);
 			(void) zfs_ereport_post_checksum(zio->io_spa, vd,
 			    NULL, zio, is->is_target_offset, is->is_size,
 			    NULL, NULL, NULL);
+			mutex_enter(&vd->vdev_stat_lock);
+			vd->vdev_stat.vs_checksum_errors++;
+			mutex_exit(&vd->vdev_stat_lock);
 		}
 	}
 }
@@ -1659,8 +1664,8 @@ out:
 	for (indirect_split_t *is = list_head(&iv->iv_splits);
 	    is != NULL; is = list_next(&iv->iv_splits, is)) {
 		indirect_child_t *ic;
-		while ((ic = list_remove_head(&is->is_unique_child)) != NULL)
-			;
+		while ((ic = list_head(&is->is_unique_child)) != NULL)
+			list_remove(&is->is_unique_child, ic);
 
 		is->is_unique_children = 0;
 	}
@@ -1833,19 +1838,6 @@ vdev_indirect_io_done(zio_t *zio)
 
 	zio_bad_cksum_t zbc;
 	int ret = zio_checksum_error(zio, &zbc);
-	/*
-	 * Any Direct I/O read that has a checksum error must be treated as
-	 * suspicious as the contents of the buffer could be getting
-	 * manipulated while the I/O is taking place. The checksum verify error
-	 * will be reported to the top-level VDEV.
-	 */
-	if (zio->io_flags & ZIO_FLAG_DIO_READ && ret == ECKSUM) {
-		zio->io_error = ret;
-		zio->io_flags |= ZIO_FLAG_DIO_CHKSUM_ERR;
-		zio_dio_chksum_verify_error_report(zio);
-		ret = 0;
-	}
-
 	if (ret == 0) {
 		zio_checksum_verified(zio);
 		return;
@@ -1897,27 +1889,24 @@ EXPORT_SYMBOL(vdev_indirect_sync_obsolete);
 EXPORT_SYMBOL(vdev_obsolete_counts_are_precise);
 EXPORT_SYMBOL(vdev_obsolete_sm_object);
 
-ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, indirect_vdevs_enable, INT,
-	ZMOD_RW, "Whether to attempt condensing indirect vdev mappings");
+/* BEGIN CSTYLED */
+ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, indirect_vdevs_enable, INT, ZMOD_RW,
+	"Whether to attempt condensing indirect vdev mappings");
 
-ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, indirect_obsolete_pct, UINT,
-	ZMOD_RW,
-	"Minimum obsolete percent of bytes in the mapping "
-	"to attempt condensing");
+ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, indirect_obsolete_pct, INT, ZMOD_RW,
+	"Minimum obsolete percent of bytes in the mapping to attempt condensing");
 
-ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, min_mapping_bytes, U64, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, min_mapping_bytes, ULONG, ZMOD_RW,
 	"Don't bother condensing if the mapping uses less than this amount of "
 	"memory");
 
-ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, max_obsolete_bytes, U64,
-	ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, max_obsolete_bytes, ULONG, ZMOD_RW,
 	"Minimum size obsolete spacemap to attempt condensing");
 
-ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, indirect_commit_entry_delay_ms,
-	UINT, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_condense, zfs_condense_, indirect_commit_entry_delay_ms, INT, ZMOD_RW,
 	"Used by tests to ensure certain actions happen in the middle of a "
 	"condense. A maximum value of 1 should be sufficient.");
 
-ZFS_MODULE_PARAM(zfs_reconstruct, zfs_reconstruct_, indirect_combinations_max,
-	UINT, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_reconstruct, zfs_reconstruct_, indirect_combinations_max, INT, ZMOD_RW,
 	"Maximum number of combinations when reconstructing split segments");
+/* END CSTYLED */

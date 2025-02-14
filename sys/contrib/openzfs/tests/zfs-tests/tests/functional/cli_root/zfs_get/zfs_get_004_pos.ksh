@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,9 +47,11 @@ function cleanup
 {
 	[[ -e $propfile ]] && rm -f $propfile
 
-	datasetexists $clone  && destroy_dataset $clone
+	datasetexists $clone  && \
+		log_must zfs destroy $clone
 	for snap in $fssnap $volsnap ; do
-		snapexists $snap && destroy_dataset $snap
+		snapexists $snap && \
+			log_must zfs destroy $snap
 	done
 
 	if [[ -n $globalzone ]] ; then
@@ -62,7 +64,8 @@ function cleanup
 		done
 	else
 		for fs in $TESTPOOL/$TESTFS1 $TESTPOOL/$TESTFS2 $TESTPOOL/$TESTFS3; do
-			datasetexists $fs && destroy_dataset $fs -rf
+			datasetexists $fs && \
+				log_must zfs destroy -rf $fs
 		done
 	fi
 }
@@ -163,12 +166,15 @@ while (( i < ${#opts[*]} )); do
 	log_must eval "zfs get ${opts[i]} all >$propfile"
 
 	for ds in $allds; do
-		grep -q $ds $propfile || \
+		grep $ds $propfile >/dev/null 2>&1
+		(( $? != 0 )) && \
 			log_fail "There is no property for" \
 				"dataset $ds in 'get all' output."
 
-		propnum=$(awk -v ds="${ds}$" '$1 ~ ds {++cnt}  END {print cnt}' $propfile)
-		case $(zfs get -H -o value type $ds) in
+		propnum=`cat $propfile | awk '{print $1}' | \
+			grep "${ds}$" | wc -l`
+		ds_type=`zfs get -H -o value type $ds`
+		case $ds_type in
 			filesystem )
 				(( propnum < fspropnum )) && \
 				(( failflag += 1 ))

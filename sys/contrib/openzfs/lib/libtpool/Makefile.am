@@ -1,11 +1,11 @@
-libtpool_la_CFLAGS  = $(AM_CFLAGS) $(LIBRARY_CFLAGS)
-libtpool_la_CFLAGS += -fvisibility=hidden
-# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=61118
-libtpool_la_CFLAGS += $(NO_CLOBBERED)
+include $(top_srcdir)/config/Rules.am
 
-noinst_LTLIBRARIES += libtpool.la
-CPPCHECKTARGETS    += libtpool.la
+noinst_LTLIBRARIES = libtpool.la
 
-libtpool_la_SOURCES = \
-	%D%/thread_pool.c \
-	%D%/thread_pool_impl.h
+USER_C = \
+	thread_pool.c \
+	thread_pool_impl.h
+
+libtpool_la_SOURCES = $(USER_C)
+
+include $(top_srcdir)/config/CppCheck.am

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -46,17 +46,21 @@ verify_runnable "both"
 
 function cleanup
 {
-	datasetexists $TESTPOOL/$TESTCTR@snap-new && \
-		destroy_dataset $TESTPOOL/$TESTCTR@snap-new -f
+	if datasetexists $TESTPOOL/$TESTCTR@snap-new ; then
+		log_must zfs destroy -f $TESTPOOL/$TESTCTR@snap-new
+	fi
 
-	datasetexists $TESTPOOL/$TESTCTR@snap && \
-		destroy_dataset $TESTPOOL/$TESTCTR@snap -f
+	if datasetexists $TESTPOOL/$TESTCTR@snap ; then
+		log_must zfs destroy -f $TESTPOOL/$TESTCTR@snap
+	fi
 
-	datasetexists $TESTPOOL@snap-new && \
-		destroy_dataset $TESTPOOL@snap-new -f
+	if datasetexists $TESTPOOL@snap-new ; then
+		log_must zfs destroy -f $TESTPOOL@snap-new
+	fi
 
-	datasetexists $TESTPOOL@snap && \
-		destroy_dataset $TESTPOOL@snap -f
+	if datasetexists $TESTPOOL@snap ; then
+		log_must zfs destroy -f $TESTPOOL@snap
+	fi
 }
 
 log_assert "zfs rename -r can rename snapshot when child datasets" \

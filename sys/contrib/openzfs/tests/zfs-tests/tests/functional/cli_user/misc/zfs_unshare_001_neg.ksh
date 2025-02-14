@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -52,13 +52,17 @@ fi
 log_assert "zfs unshare returns an error when run as a user"
 
 #  verify that the filesystem was shared initially
-log_mustnot not_shared $TESTDIR/shared
-log_fail "$TESTPOOL/$TESTFS/shared was not shared initially at all!"
+if not_shared $TESTDIR/shared
+then
+	log_fail "$TESTPOOL/$TESTFS/shared was not shared initially at all!"
+fi
 
 log_mustnot zfs unshare $TESTPOOL/$TESTFS/shared
 
 # now verify that the above command didn't do anything
-log_mustnot not_shared $TESTDIR/shared
-log_fail "$TESTPOOL/$TESTFS/shared was actually unshared!"
+if not_shared $TESTDIR/shared
+then
+	log_fail "$TESTPOOL/$TESTFS/shared was actually unshared!"
+fi
 
 log_pass "zfs unshare returns an error when run as a user"

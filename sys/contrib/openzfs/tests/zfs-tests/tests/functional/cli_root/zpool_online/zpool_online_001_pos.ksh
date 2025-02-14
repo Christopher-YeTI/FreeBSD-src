@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -54,7 +54,10 @@ function cleanup
 	#
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "online"
+		check_state $TESTPOOL $disk "online"
+		if [[ $? != 0 ]]; then
+			log_fail "Unable to online $disk"
+		fi
 
 	done
 }
@@ -74,12 +77,18 @@ for disk in $DISKLIST; do
 	i=0
 	while [[ $i -lt ${#args[*]} ]]; do
 
-		sync_pool $TESTPOOL
+		log_must sync_pool $TESTPOOL
 		log_must zpool offline $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "offline"
+		check_state $TESTPOOL $disk "offline"
+		if [[ $? != 0 ]]; then
+			log_fail "$disk of $TESTPOOL did not match offline state"
+		fi
 
 		log_must zpool online ${args[$i]} $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "online"
+		check_state $TESTPOOL $disk "online"
+		if [[ $? != 0 ]]; then
+			log_fail "$disk of $TESTPOOL did not match online state"
+		fi
 
 		while [[ $j -lt 20 ]]; do
 			is_pool_resilvered $TESTPOOL && break
@@ -103,7 +112,10 @@ for disk in $DISKLIST; do
         while [[ $i -lt $iters ]]; do
 		index=`expr $RANDOM % ${#args[*]}`
                 log_must zpool online ${args[$index]} $TESTPOOL $disk
-                log_must check_state $TESTPOOL $disk "online"
+                check_state $TESTPOOL $disk "online"
+                if [[ $? != 0 ]]; then
+                        log_fail "$disk of $TESTPOOL did not match online state"
+                fi
 
                 (( i = i + 1 ))
         done

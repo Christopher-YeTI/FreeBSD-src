@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lauxlib.h,v 1.120.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Auxiliary functions for building Lua libraries
@@ -170,3 +171,5 @@ LUALIB_API void (luaL_openlib) (lua_State *L, const char *libname,
 
 
 #endif
+
+/* END CSTYLED */

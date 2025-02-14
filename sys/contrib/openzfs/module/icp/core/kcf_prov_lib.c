@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -33,11 +33,12 @@
  */
 
 /*
- * Utility routine to apply the command COPY_TO_DATA to the
+ * Utility routine to apply the command, 'cmd', to the
  * data in the uio structure.
  */
-static int
-crypto_uio_copy_to_data(crypto_data_t *data, uchar_t *buf, int len)
+int
+crypto_uio_data(crypto_data_t *data, uchar_t *buf, int len, cmd_type_t cmd,
+    void *digest_ctx, void (*update)(void))
 {
 	zfs_uio_t *uiop = data->cd_uio;
 	off_t offset = data->cd_offset;
@@ -70,8 +71,26 @@ crypto_uio_copy_to_data(crypto_data_t *data, uchar_t *buf, int len)
 		    offset, length);
 
 		datap = (uchar_t *)(zfs_uio_iovbase(uiop, vec_idx) + offset);
-		memcpy(datap, buf, cur_len);
-		buf += cur_len;
+		switch (cmd) {
+		case COPY_FROM_DATA:
+			bcopy(datap, buf, cur_len);
+			buf += cur_len;
+			break;
+		case COPY_TO_DATA:
+			bcopy(buf, datap, cur_len);
+			buf += cur_len;
+			break;
+		case COMPARE_TO_DATA:
+			if (bcmp(datap, buf, cur_len))
+				return (CRYPTO_SIGNATURE_INVALID);
+			buf += cur_len;
+			break;
+		case MD5_DIGEST_DATA:
+		case SHA1_DIGEST_DATA:
+		case SHA2_DIGEST_DATA:
+		case GHASH_DATA:
+			return (CRYPTO_ARGUMENTS_BAD);
+		}
 
 		length -= cur_len;
 		vec_idx++;
@@ -80,11 +99,16 @@ crypto_uio_copy_to_data(crypto_data_t *data, uchar_t *buf, int len)
 
 	if (vec_idx == zfs_uio_iovcnt(uiop) && length > 0) {
 		/*
-		 * The end of the specified iovecs was reached but
+		 * The end of the specified iovec's was reached but
 		 * the length requested could not be processed.
 		 */
-		data->cd_length = len;
-		return (CRYPTO_BUFFER_TOO_SMALL);
+		switch (cmd) {
+		case COPY_TO_DATA:
+			data->cd_length = len;
+			return (CRYPTO_BUFFER_TOO_SMALL);
+		default:
+			return (CRYPTO_DATA_LEN_RANGE);
+		}
 	}
 
 	return (CRYPTO_SUCCESS);
@@ -99,12 +123,13 @@ crypto_put_output_data(uchar_t *buf, crypto_data_t *output, int len)
 			output->cd_length = len;
 			return (CRYPTO_BUFFER_TOO_SMALL);
 		}
-		memcpy((uchar_t *)(output->cd_raw.iov_base +
-		    output->cd_offset), buf, len);
+		bcopy(buf, (uchar_t *)(output->cd_raw.iov_base +
+		    output->cd_offset), len);
 		break;
 
 	case CRYPTO_DATA_UIO:
-		return (crypto_uio_copy_to_data(output, buf, len));
+		return (crypto_uio_data(output, buf, len,
+		    COPY_TO_DATA, NULL, NULL));
 	default:
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
@@ -114,21 +139,33 @@ crypto_put_output_data(uchar_t *buf, crypto_data_t *output, int len)
 
 int
 crypto_update_iov(void *ctx, crypto_data_t *input, crypto_data_t *output,
-    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *))
+    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *),
+    void (*copy_block)(uint8_t *, uint64_t *))
 {
+	common_ctx_t *common_ctx = ctx;
+	int rv;
+
 	ASSERT(input != output);
+	if (input->cd_miscdata != NULL) {
+		copy_block((uint8_t *)input->cd_miscdata,
+		    &common_ctx->cc_iv[0]);
+	}
 
 	if (input->cd_raw.iov_len < input->cd_length)
 		return (CRYPTO_ARGUMENTS_BAD);
 
-	return ((cipher)(ctx, input->cd_raw.iov_base + input->cd_offset,
-	    input->cd_length, output));
+	rv = (cipher)(ctx, input->cd_raw.iov_base + input->cd_offset,
+	    input->cd_length, output);
+
+	return (rv);
 }
 
 int
 crypto_update_uio(void *ctx, crypto_data_t *input, crypto_data_t *output,
-    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *))
+    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *),
+    void (*copy_block)(uint8_t *, uint64_t *))
 {
+	common_ctx_t *common_ctx = ctx;
 	zfs_uio_t *uiop = input->cd_uio;
 	off_t offset = input->cd_offset;
 	size_t length = input->cd_length;
@@ -136,6 +173,10 @@ crypto_update_uio(void *ctx, crypto_data_t *input, crypto_data_t *output,
 	size_t cur_len;
 
 	ASSERT(input != output);
+	if (input->cd_miscdata != NULL) {
+		copy_block((uint8_t *)input->cd_miscdata,
+		    &common_ctx->cc_iv[0]);
+	}
 
 	if (zfs_uio_segflg(input->cd_uio) != UIO_SYSSPACE) {
 		return (CRYPTO_ARGUMENTS_BAD);

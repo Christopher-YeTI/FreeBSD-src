@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -114,7 +114,10 @@ do
 
 	# Reimport pool with drive missing
 	log_must zpool import $TESTPOOL
-	log_must check_state $TESTPOOL "" "degraded"
+	check_state $TESTPOOL "" "degraded"
+	if (($? != 0)); then
+		log_fail "$TESTPOOL is not degraded"
+	fi
 
 	# Clear zpool events
 	log_must zpool events -c
@@ -131,8 +134,9 @@ do
 		((timeout++))
 
 		sleep 1
-		if zpool events $TESTPOOL \
-		    | grep -qF sysevent.fs.zfs.resilver_finish; then
+		zpool events $TESTPOOL \
+		    | egrep sysevent.fs.zfs.resilver_finish > /dev/null
+		if (($? == 0)); then
 			log_note "Auto-online of $offline_disk is complete"
 			sleep 1
 			break
@@ -140,7 +144,10 @@ do
 	done
 
 	# Validate auto-online was successful
-	log_must check_state $TESTPOOL "" "online"
+	check_state $TESTPOOL "" "online"
+	if (($? != 0)); then
+		log_fail "$TESTPOOL is not back online"
+	fi
 	sleep 2
 done
 log_must zpool destroy $TESTPOOL

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -96,8 +96,8 @@ function cleanup_all
 		(( i = i + 4 ))
 	done
 
-	datasetexists $TESTPOOL1/$TESTFS && \
-		destroy_dataset $TESTPOOL1/$TESTFS -f
+	datasetexists $TESTPOOL1/$TESTFS  && \
+		log_must zfs destroy -f $TESTPOOL1/$TESTFS
 
 	destroy_pool $TESTPOOL1
 
@@ -113,7 +113,8 @@ log_onexit cleanup_all
 
 setup_all
 
-[ -n $TESTDIR ] && log_must rm -rf $TESTDIR/*
+[[ -n $TESTDIR ]] && \
+    log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 
 typeset -i COUNT=10
 typeset -i i=0
@@ -142,7 +143,8 @@ while (( i < ${#args[*]} )); do
 	if [[ -n ${args[i+3]} ]] ; then
 		log_must zfs set mountpoint=${args[i+3]} ${args[i+2]}
 
-		FILE_COUNT=$(ls -A ${args[i+3]} | grep -cvF ".zfs")
+		FILE_COUNT=`ls -Al ${args[i+3]} | grep -v "total" \
+		    | grep -v "\.zfs" | wc -l`
 		if [[ $FILE_COUNT -ne $COUNT ]]; then
 			ls -Al ${args[i+3]}
 			log_fail "AFTER: ${args[i+3]} contains $FILE_COUNT files(s)."
@@ -156,7 +158,7 @@ while (( i < ${#args[*]} )); do
 			(( j = j + 1 ))
 		done
 
-		FILE_COUNT=$(ls -A ${args[i+3]}/after* | wc -l)
+		FILE_COUNT=`ls -Al ${args[i+3]}/after* | grep -v "total" | wc -l`
 		if [[ $FILE_COUNT -ne $COUNT ]]; then
 			ls -Al ${args[i+3]}
 			log_fail "${args[i+3]} contains $FILE_COUNT after* files(s)."

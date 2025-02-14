@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -18,19 +18,22 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright (c) 2024, Klara, Inc.
- */
 
 #ifndef	_SYS_ZVOL_IMPL_H
 #define	_SYS_ZVOL_IMPL_H
 
 #include <sys/zfs_context.h>
 
-#define	ZVOL_RDONLY	(1<<0)	/* zvol is readonly (writes rejected) */
-#define	ZVOL_WRITTEN_TO	(1<<1)	/* zvol has been written to (needs flush) */
-#define	ZVOL_EXCL	(1<<2)	/* zvol has O_EXCL client right now */
-#define	ZVOL_REMOVING	(1<<3)	/* zvol waiting to remove minor */
+#define	ZVOL_RDONLY	0x1
+/*
+ * Whether the zvol has been written to (as opposed to ZVOL_RDONLY, which
+ * specifies whether or not the zvol _can_ be written to)
+ */
+#define	ZVOL_WRITTEN_TO	0x2
+
+#define	ZVOL_DUMPIFIED	0x4
+
+#define	ZVOL_EXCL	0x8
 
 /*
  * The in-core state of each volume.
@@ -54,17 +57,16 @@ typedef struct zvol_state {
 	kmutex_t		zv_state_lock;	/* protects zvol_state_t */
 	atomic_t		zv_suspend_ref;	/* refcount for suspend */
 	krwlock_t		zv_suspend_lock;	/* suspend lock */
-	kcondvar_t		zv_removing_cv;	/* ready to remove minor */
 	struct zvol_state_os	*zv_zso;	/* private platform state */
-	boolean_t		zv_threading;	/* volthreading property */
 } zvol_state_t;
 
 
+extern list_t zvol_state_list;
 extern krwlock_t zvol_state_lock;
 #define	ZVOL_HT_SIZE	1024
 extern struct hlist_head *zvol_htable;
 #define	ZVOL_HT_HEAD(hash)	(&zvol_htable[(hash) & (ZVOL_HT_SIZE-1)])
-extern zil_replay_func_t *const zvol_replay_vector[TX_MAX_TYPE];
+extern zil_replay_func_t *zvol_replay_vector[TX_MAX_TYPE];
 
 extern unsigned int zvol_volmode;
 extern unsigned int zvol_inhibit_dev;
@@ -80,9 +82,9 @@ void zvol_remove_minors_impl(const char *name);
 void zvol_last_close(zvol_state_t *zv);
 void zvol_insert(zvol_state_t *zv);
 void zvol_log_truncate(zvol_state_t *zv, dmu_tx_t *tx, uint64_t off,
-    uint64_t len);
+    uint64_t len, boolean_t sync);
 void zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, uint64_t offset,
-    uint64_t size, boolean_t commit);
+    uint64_t size, int sync);
 int zvol_get_data(void *arg, uint64_t arg2, lr_write_t *lr, char *buf,
     struct lwb *lwb, zio_t *zio);
 int zvol_init_impl(void);
@@ -92,13 +94,17 @@ void zvol_wait_close(zvol_state_t *zv);
 /*
  * platform dependent functions exported to platform independent code
  */
-void zvol_os_free(zvol_state_t *zv);
-void zvol_os_rename_minor(zvol_state_t *zv, const char *newname);
-int zvol_os_create_minor(const char *name);
-int zvol_os_update_volsize(zvol_state_t *zv, uint64_t volsize);
-boolean_t zvol_os_is_zvol(const char *path);
-void zvol_os_clear_private(zvol_state_t *zv);
-void zvol_os_set_disk_ro(zvol_state_t *zv, int flags);
-void zvol_os_set_capacity(zvol_state_t *zv, uint64_t capacity);
+typedef struct zvol_platform_ops {
+	void (*zv_free)(zvol_state_t *);
+	void (*zv_rename_minor)(zvol_state_t *, const char *);
+	int (*zv_create_minor)(const char *);
+	int (*zv_update_volsize)(zvol_state_t *, uint64_t);
+	boolean_t (*zv_is_zvol)(const char *);
+	void (*zv_clear_private)(zvol_state_t *);
+	void (*zv_set_disk_ro)(zvol_state_t *, int flags);
+	void (*zv_set_capacity)(zvol_state_t *, uint64_t capacity);
+} zvol_platform_ops_t;
+
+void zvol_register_ops(const zvol_platform_ops_t *ops);
 
 #endif

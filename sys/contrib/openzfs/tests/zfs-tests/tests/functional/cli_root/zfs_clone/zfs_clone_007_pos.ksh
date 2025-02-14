@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -40,13 +40,16 @@
 # 2. Verify it succeed while upgrade, but fails while the version downgraded.
 #
 
-ZFS_VERSION=$(zfs upgrade | grep -wom1 '[[:digit:]]*')
+ZFS_VERSION=$(zfs upgrade | head -1 | awk '{print $NF}' \
+	| sed -e 's/\.//g')
 
 verify_runnable "both"
 
 function cleanup
 {
-	snapexists $SNAPFS && destroy_dataset $SNAPFS -Rf
+	if snapexists $SNAPFS ; then
+			log_must zfs destroy -Rf $SNAPFS
+	fi
 }
 
 log_onexit cleanup

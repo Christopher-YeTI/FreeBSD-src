@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -45,15 +45,7 @@
 
 verify_runnable "global"
 
-function cleanup
-{
-	for file in $ZFS_DEV $MNTTAB; do
-		log_must eval "[ -e ${file} ] || mv ${file}.bak $file"
-	done
-}
-
 log_assert "zfs fails with unexpected scenario."
-log_onexit cleanup
 
 #verify zfs failed if ZFS_DEV cannot be opened
 ZFS_DEV=/dev/zfs
@@ -64,11 +56,13 @@ if is_linux; then
 fi
 
 for file in $ZFS_DEV $MNTTAB; do
-	log_must mv $file ${file}.bak
+	if [[ -e $file ]]; then
+		mv $file ${file}.bak
+	fi
 	for cmd in "" "list" "get all" "mount"; do
 		log_mustnot eval "zfs $cmd >/dev/null 2>&1"
 	done
-	log_must mv ${file}.bak $file
+	mv ${file}.bak $file
 done
 
 log_pass "zfs fails with unexpected scenario as expected."

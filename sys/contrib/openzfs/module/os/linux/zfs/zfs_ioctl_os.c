@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -37,7 +37,6 @@
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017 Open-E, Inc. All Rights Reserved.
  * Copyright (c) 2019 Datto Inc.
- * Copyright (c) 2021 Klara, Inc.
  */
 
 #include <sys/types.h>
@@ -59,8 +58,6 @@
 #include <sys/zvol.h>
 #include <sys/fm/util.h>
 #include <sys/dsl_crypt.h>
-#include <sys/crypto/icp.h>
-#include <sys/zstd/zstd.h>
 
 #include <sys/zfs_ioctl_impl.h>
 
@@ -90,20 +87,71 @@ zfs_vfs_rele(zfsvfs_t *zfsvfs)
 	deactivate_super(zfsvfs->z_sb);
 }
 
-void
-zfsdev_private_set_state(void *priv, zfsdev_state_t *zs)
+static int
+zfsdev_state_init(struct file *filp)
 {
-	struct file *filp = priv;
+	zfsdev_state_t *zs, *zsprev = NULL;
+	minor_t minor;
+	boolean_t newzs = B_FALSE;
+
+	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
+
+	minor = zfsdev_minor_alloc();
+	if (minor == 0)
+		return (SET_ERROR(ENXIO));
+
+	for (zs = zfsdev_state_list; zs != NULL; zs = zs->zs_next) {
+		if (zs->zs_minor == -1)
+			break;
+		zsprev = zs;
+	}
+
+	if (!zs) {
+		zs = kmem_zalloc(sizeof (zfsdev_state_t), KM_SLEEP);
+		newzs = B_TRUE;
+	}
 
 	filp->private_data = zs;
+
+	zfs_onexit_init((zfs_onexit_t **)&zs->zs_onexit);
+	zfs_zevent_init((zfs_zevent_t **)&zs->zs_zevent);
+
+	/*
+	 * In order to provide for lock-free concurrent read access
+	 * to the minor list in zfsdev_get_state_impl(), new entries
+	 * must be completely written before linking them into the
+	 * list whereas existing entries are already linked; the last
+	 * operation must be updating zs_minor (from -1 to the new
+	 * value).
+	 */
+	if (newzs) {
+		zs->zs_minor = minor;
+		smp_wmb();
+		zsprev->zs_next = zs;
+	} else {
+		smp_wmb();
+		zs->zs_minor = minor;
+	}
+
+	return (0);
 }
 
-zfsdev_state_t *
-zfsdev_private_get_state(void *priv)
+static int
+zfsdev_state_destroy(struct file *filp)
 {
-	struct file *filp = priv;
+	zfsdev_state_t *zs;
 
-	return (filp->private_data);
+	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
+	ASSERT(filp->private_data != NULL);
+
+	zs = filp->private_data;
+	zs->zs_minor = -1;
+	zfs_onexit_destroy(zs->zs_onexit);
+	zfs_zevent_destroy(zs->zs_zevent);
+	zs->zs_onexit = NULL;
+	zs->zs_zevent = NULL;
+
+	return (0);
 }
 
 static int
@@ -121,9 +169,13 @@ zfsdev_open(struct inode *ino, struct file *filp)
 static int
 zfsdev_release(struct inode *ino, struct file *filp)
 {
-	zfsdev_state_destroy(filp);
+	int error;
 
-	return (0);
+	mutex_enter(&zfsdev_state_lock);
+	error = zfsdev_state_destroy(filp);
+	mutex_exit(&zfsdev_state_lock);
+
+	return (-error);
 }
 
 static long
@@ -135,7 +187,7 @@ zfsdev_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 
 	vecnum = cmd - ZFS_IOC_FIRST;
 
-	zc = vmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 
 	if (ddi_copyin((void *)(uintptr_t)arg, zc, sizeof (zfs_cmd_t), 0)) {
 		error = -SET_ERROR(EFAULT);
@@ -146,51 +198,9 @@ zfsdev_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 	if (error == 0 && rc != 0)
 		error = -SET_ERROR(EFAULT);
 out:
-	vmem_free(zc, sizeof (zfs_cmd_t));
+	kmem_free(zc, sizeof (zfs_cmd_t));
 	return (error);
 
-}
-
-static int
-zfs_ioc_userns_attach(zfs_cmd_t *zc)
-{
-	int error;
-
-	if (zc == NULL)
-		return (SET_ERROR(EINVAL));
-
-	error = zone_dataset_attach(CRED(), zc->zc_name, zc->zc_cleanup_fd);
-
-	/*
-	 * Translate ENOTTY to ZFS_ERR_NOT_USER_NAMESPACE as we just arrived
-	 * back from the SPL layer, which does not know about ZFS_ERR_* errors.
-	 * See the comment at the user_ns_get() function in spl-zone.c for
-	 * details.
-	 */
-	if (error == ENOTTY)
-		error = ZFS_ERR_NOT_USER_NAMESPACE;
-
-	return (error);
-}
-
-static int
-zfs_ioc_userns_detach(zfs_cmd_t *zc)
-{
-	int error;
-
-	if (zc == NULL)
-		return (SET_ERROR(EINVAL));
-
-	error = zone_dataset_detach(CRED(), zc->zc_name, zc->zc_cleanup_fd);
-
-	/*
-	 * See the comment in zfs_ioc_userns_attach() for details on what is
-	 * going on here.
-	 */
-	if (error == ENOTTY)
-		error = ZFS_ERR_NOT_USER_NAMESPACE;
-
-	return (error);
 }
 
 uint64_t
@@ -211,10 +221,6 @@ zfs_ioctl_update_mount_cache(const char *dsname)
 void
 zfs_ioctl_init_os(void)
 {
-	zfs_ioctl_register_dataset_nolog(ZFS_IOC_USERNS_ATTACH,
-	    zfs_ioc_userns_attach, zfs_secpolicy_config, POOL_CHECK_NONE);
-	zfs_ioctl_register_dataset_nolog(ZFS_IOC_USERNS_DETACH,
-	    zfs_ioc_userns_detach, zfs_secpolicy_config, POOL_CHECK_NONE);
 }
 
 #ifdef CONFIG_COMPAT
@@ -282,10 +288,8 @@ zfsdev_detach(void)
 #define	ZFS_DEBUG_STR	""
 #endif
 
-zidmap_t *zfs_init_idmap;
-
-static int
-openzfs_init_os(void)
+static int __init
+openzfs_init(void)
 {
 	int error;
 
@@ -303,23 +307,15 @@ openzfs_init_os(void)
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
 	    ZFS_META_VERSION, ZFS_META_RELEASE, ZFS_DEBUG_STR,
 	    SPA_VERSION_STRING, ZPL_VERSION_STRING);
-#ifdef HAVE_LINUX_EXPERIMENTAL
-	printk(KERN_NOTICE "ZFS: Using ZFS with kernel %s is EXPERIMENTAL and "
-	    "SERIOUS DATA LOSS may occur!\n", utsname()->release);
-	printk(KERN_NOTICE "ZFS: Please report your results at: "
-	    "https://github.com/openzfs/zfs/issues/new\n");
-#endif
 #ifndef CONFIG_FS_POSIX_ACL
 	printk(KERN_NOTICE "ZFS: Posix ACLs disabled by kernel\n");
 #endif /* CONFIG_FS_POSIX_ACL */
 
-	zfs_init_idmap = (zidmap_t *)zfs_get_init_idmap();
-
 	return (0);
 }
 
-static void
-openzfs_fini_os(void)
+static void __exit
+openzfs_fini(void)
 {
 	zfs_sysfs_fini();
 	zfs_kmod_fini();
@@ -328,58 +324,12 @@ openzfs_fini_os(void)
 	    ZFS_META_VERSION, ZFS_META_RELEASE, ZFS_DEBUG_STR);
 }
 
-
-extern int __init zcommon_init(void);
-extern void zcommon_fini(void);
-
-static int __init
-openzfs_init(void)
-{
-	int err;
-	if ((err = zcommon_init()) != 0)
-		goto zcommon_failed;
-	if ((err = icp_init()) != 0)
-		goto icp_failed;
-	if ((err = zstd_init()) != 0)
-		goto zstd_failed;
-	if ((err = openzfs_init_os()) != 0)
-		goto openzfs_os_failed;
-	return (0);
-
-openzfs_os_failed:
-	zstd_fini();
-zstd_failed:
-	icp_fini();
-icp_failed:
-	zcommon_fini();
-zcommon_failed:
-	return (err);
-}
-
-static void __exit
-openzfs_fini(void)
-{
-	openzfs_fini_os();
-	zstd_fini();
-	icp_fini();
-	zcommon_fini();
-}
-
 #if defined(_KERNEL)
 module_init(openzfs_init);
 module_exit(openzfs_fini);
 #endif
 
-MODULE_ALIAS("zavl");
-MODULE_ALIAS("icp");
-MODULE_ALIAS("zlua");
-MODULE_ALIAS("znvpair");
-MODULE_ALIAS("zunicode");
-MODULE_ALIAS("zcommon");
-MODULE_ALIAS("zzstd");
-MODULE_DESCRIPTION("ZFS");
-MODULE_AUTHOR(ZFS_META_AUTHOR);
-MODULE_LICENSE("Dual MIT/GPL"); /* lua */
-MODULE_LICENSE("Dual BSD/GPL"); /* zstd / misc */
-MODULE_LICENSE(ZFS_META_LICENSE);
-MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
+ZFS_MODULE_DESCRIPTION("ZFS");
+ZFS_MODULE_AUTHOR(ZFS_META_AUTHOR);
+ZFS_MODULE_LICENSE(ZFS_META_LICENSE);
+ZFS_MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);

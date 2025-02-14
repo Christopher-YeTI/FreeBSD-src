@@ -32,15 +32,17 @@ verify_runnable "both"
 function cleanup
 {
 	for snap in $TESTSNAP1 $TESTSNAP2; do
-		snapexists "$snap" && destroy_dataset "$snap"
+		if snapexists "$snap"; then
+			log_must zfs destroy "$snap"
+		fi
 	done
 }
 
 log_assert "'zfs diff' should only work with supported options."
 log_onexit cleanup
 
-typeset goodopts=("" "-h" "-t" "-th" "-H" "-Hh" "-Ht" "-Hth" "-F" "-Fh" "-Ft" "-Fth" "-FH" "-FHh" "-FHt" "-FHth")
-typeset badopts=("-f" "-T" "-Fx" "-Ho" "-tT" "-")
+typeset goodopts=("" "-F" "-H" "-t" "-FH" "-Ft" "-Ht" "-FHt")
+typeset badopts=("-f" "-h" "-h" "-T" "-Fx" "-Ho" "-tT" "-")
 
 DATASET="$TESTPOOL/$TESTFS"
 TESTSNAP1="$DATASET@snap1"

@@ -34,7 +34,7 @@ function create_testfs
 function destroy_testfs
 {
 	if datasetexists $TESTPOOL/$TESTFS ; then
-		destroy_dataset $TESTPOOL/$TESTFS -f
+		log_must zfs destroy -f $TESTPOOL/$TESTFS
 		rm -rf $TESTDIR || log_unresolved Could not remove $TESTDIR
 	fi
 }
@@ -50,8 +50,13 @@ function delete_file
 {
 	typeset name=$TESTDIR/$1
 
-	rm $name >/dev/null 2>&1 || return 1
-	if [ -f $name ]; then
+	rm $name >/dev/null 2>&1
+
+	if [[ $? -ne 0 ]] ; then
+		return 1
+	fi
+
+	if [[ -f $name ]] ; then
 		return 2
 	fi
 }
@@ -81,7 +86,10 @@ function lookup_file_ci
 function lookup_any
 {
 	for name in $NAMES_ALL ; do
-		lookup_file $name && return
+		lookup_file $name
+		if [[ $? -eq 0 ]] ; then
+			return 0
+		fi
 	done
 
 	return 1

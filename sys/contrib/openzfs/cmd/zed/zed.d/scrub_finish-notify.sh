@@ -1,5 +1,4 @@
 #!/bin/sh
-# shellcheck disable=SC2154
 #
 # Send notification in response to a RESILVER_FINISH or SCRUB_FINISH.
 #

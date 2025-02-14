@@ -1,18 +1,18 @@
-zdb_CPPFLAGS = $(AM_CPPFLAGS) $(LIBZPOOL_CPPFLAGS)
-zdb_CFLAGS   = $(AM_CFLAGS) $(LIBCRYPTO_CFLAGS)
+include $(top_srcdir)/config/Rules.am
 
-sbin_PROGRAMS   += zdb
-CPPCHECKTARGETS += zdb
+# Unconditionally enable debugging for zdb
+AM_CPPFLAGS += -DDEBUG -UNDEBUG -DZFS_DEBUG
+
+sbin_PROGRAMS = zdb
 
 zdb_SOURCES = \
-	%D%/zdb.c \
-	%D%/zdb.h \
-	%D%/zdb_il.c
+	zdb.c \
+	zdb_il.c \
+	zdb.h
 
 zdb_LDADD = \
-	libzdb.la \
-	libzpool.la \
-	libzfs_core.la \
-	libnvpair.la
+	$(abs_top_builddir)/lib/libzpool/libzpool.la \
+	$(abs_top_builddir)/lib/libzfs_core/libzfs_core.la \
+	$(abs_top_builddir)/lib/libnvpair/libnvpair.la
 
-zdb_LDADD += $(LIBCRYPTO_LIBS)
+include $(top_srcdir)/config/CppCheck.am

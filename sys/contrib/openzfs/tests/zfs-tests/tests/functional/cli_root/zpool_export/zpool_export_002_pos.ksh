@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -45,7 +45,9 @@ verify_runnable "global"
 
 function cleanup
 {
-	log_must cd $olddir
+	cd $olddir || \
+	    log_fail "Couldn't cd back to $olddir"
+
 	zpool_export_cleanup
 }
 
@@ -55,9 +57,16 @@ log_onexit cleanup
 
 log_assert "Verify a busy ZPOOL cannot be exported."
 
-log_must ismounted "$TESTPOOL/$TESTFS"
-log_must cd $TESTDIR
+ismounted "$TESTPOOL/$TESTFS"
+(( $? != 0 )) && \
+    log_fail "$TESTDIR not mounted. Unable to continue."
+
+cd $TESTDIR || \
+    log_fail "Couldn't cd to $TESTDIR"
+
 log_mustnot zpool export $TESTPOOL
-log_must poolexists $TESTPOOL
+
+poolexists $TESTPOOL || \
+	log_fail "$TESTPOOL not found in 'zpool list' output."
 
 log_pass "Unable to export a busy ZPOOL as expected."

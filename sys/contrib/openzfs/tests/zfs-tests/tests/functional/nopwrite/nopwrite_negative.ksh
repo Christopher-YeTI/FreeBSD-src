@@ -36,7 +36,7 @@ log_onexit cleanup
 
 function cleanup
 {
-	datasetexists $origin && destroy_dataset $origin -R
+	datasetexists $origin && log_must zfs destroy -R $origin
 	log_must zfs create -o mountpoint=$TESTDIR $origin
 }
 

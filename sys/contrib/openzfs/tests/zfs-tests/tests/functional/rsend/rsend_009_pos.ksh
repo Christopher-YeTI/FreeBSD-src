@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -45,16 +45,13 @@
 
 verify_runnable "global"
 
-BPOOL=bpool_test
-SPOOL=spool_test
-
 function cleanup
 {
-	if datasetexists $BPOOL ; then
-		log_must_busy zpool destroy -f $BPOOL
+	if datasetexists bpool ; then
+		log_must_busy zpool destroy -f bpool
 	fi
-	if datasetexists $SPOOL ; then
-		log_must_busy zpool destroy -f $SPOOL
+	if datasetexists spool ; then
+		log_must_busy zpool destroy -f spool
 	fi
 }
 
@@ -63,33 +60,33 @@ log_onexit cleanup
 
 log_must mkfile $MINVDEVSIZE $TESTDIR/bfile
 log_must mkfile $SPA_MINDEVSIZE  $TESTDIR/sfile
-log_must zpool create -O compression=off $BPOOL $TESTDIR/bfile
-log_must zpool create -O compression=off $SPOOL $TESTDIR/sfile
+log_must zpool create bpool $TESTDIR/bfile
+log_must zpool create spool $TESTDIR/sfile
 
 #
 # Test out of space on sub-filesystem
 #
-log_must zfs create $BPOOL/fs
-log_must mkfile 30M /$BPOOL/fs/file
+log_must zfs create bpool/fs
+log_must mkfile 30M /bpool/fs/file
 
-log_must zfs snapshot $BPOOL/fs@snap
-log_must eval "zfs send -R $BPOOL/fs@snap > $BACKDIR/fs-R"
-log_mustnot eval "zfs receive -d -F $SPOOL < $BACKDIR/fs-R"
+log_must zfs snapshot bpool/fs@snap
+log_must eval "zfs send -R bpool/fs@snap > $BACKDIR/fs-R"
+log_mustnot eval "zfs receive -d -F spool < $BACKDIR/fs-R"
 
-log_must datasetnonexists $SPOOL/fs
-log_must ismounted $SPOOL
+log_must datasetnonexists spool/fs
+log_must ismounted spool
 
 #
 # Test out of space on top filesystem
 #
-log_must mv /$BPOOL/fs/file /$BPOOL
-log_must_busy zfs destroy -rf $BPOOL/fs
+log_must mv /bpool/fs/file /bpool
+log_must_busy zfs destroy -rf bpool/fs
 
-log_must zfs snapshot $BPOOL@snap
-log_must eval "zfs send -R $BPOOL@snap > $BACKDIR/bpool-R"
-log_mustnot eval "zfs receive -d -F $SPOOL < $BACKDIR/bpool-R"
+log_must zfs snapshot bpool@snap
+log_must eval "zfs send -R bpool@snap > $BACKDIR/bpool-R"
+log_mustnot eval "zfs receive -d -F spool < $BACKDIR/bpool-R"
 
-log_must datasetnonexists $SPOOL/fs
-log_must ismounted $SPOOL
+log_must datasetnonexists spool/fs
+log_must ismounted spool
 
 log_pass "zfs receive can handle out of space correctly."

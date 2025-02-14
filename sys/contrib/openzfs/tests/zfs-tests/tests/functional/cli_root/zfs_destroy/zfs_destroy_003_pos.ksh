@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -50,7 +50,8 @@ verify_runnable "both"
 function cleanup
 {
 	for obj in $ctr2 $ctr1 $ctr; do
-		datasetexists $obj && destroy_dataset $obj -Rf
+		datasetexists $obj && \
+			log_must zfs destroy -Rf $obj
 	done
 
 	for mntp in $TESTDIR1 $TESTDIR2; do
@@ -141,14 +142,14 @@ done
 log_note "Verify that 'zfs destroy -R' succeeds to destroy dataset " \
 	"with dependent clone outside it."
 
-log_must_busy zfs destroy -R $ctr1
+log_must zfs destroy -R $ctr1
 datasetexists $ctr1 && \
 	log_fail "'zfs destroy -R' fails to destroy dataset with clone outside it."
 
 log_note "Verify that 'zfs destroy -r' succeeds to destroy dataset " \
 	"without dependent clone outside it."
 
-log_must_busy zfs destroy -r $ctr
+log_must zfs destroy -r $ctr
 datasetexists $ctr && \
 	log_fail "'zfs destroy -r' fails to destroy dataset with clone outside it."
 

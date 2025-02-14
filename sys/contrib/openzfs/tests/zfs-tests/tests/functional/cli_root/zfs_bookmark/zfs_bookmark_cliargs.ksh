@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -54,16 +54,15 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists "$DATASET@$TESTSNAP" && \
-		destroy_dataset "$DATASET@$TESTSNAP"
-
-	bkmarkexists "$DATASET#$TESTBM" && \
-		destroy_dataset "$DATASET#$TESTBM"
-
-	bkmarkexists "$DATASET#$TESTBMCOPY" && \
-		destroy_dataset "$DATASET#$TESTBMCOPY"
-
-	log_must rm -f "$TEST_BASE_DIR/zfstest_datastream.$$"
+	if snapexists "$DATASET@$TESTSNAP"; then
+		log_must zfs destroy "$DATASET@$TESTSNAP"
+	fi
+	if bkmarkexists "$DATASET#$TESTBM"; then
+		log_must zfs destroy "$DATASET#$TESTBM"
+	fi
+	if bkmarkexists "$DATASET#$TESTBMCOPY"; then
+		log_must zfs destroy "$DATASET#$TESTBMCOPY"
+	fi
 }
 
 log_assert "'zfs bookmark' should work only when passed valid arguments."

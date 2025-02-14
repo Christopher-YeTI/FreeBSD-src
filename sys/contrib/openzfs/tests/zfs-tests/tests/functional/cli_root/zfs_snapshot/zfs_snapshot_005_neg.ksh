@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -45,7 +45,9 @@ verify_runnable "both"
 
 function cleanup
 {
-	datasetexists $initfs && destroy_dataset $initfs -rf
+	if datasetexists $initfs ; then
+		log_must zfs destroy -rf $initfs
+	fi
 }
 
 log_assert "Verify long name filesystem with snapshot should not break ZFS."
@@ -60,7 +62,7 @@ while ((ret == 0)); do
 	ret=$?
 
 	if ((ret != 0)); then
-		len=$(( ${#basefs} + 1 )) # +1 for NUL
+		len=$(echo $basefs | wc -c)
 		log_note "The deeply-nested filesystem len: $len"
 
 		#
@@ -69,9 +71,11 @@ while ((ret == 0)); do
 		# is incorrect
 		#
 		if ((len >= 255)); then
-			datasetexists $basefs && destroy_dataset $basefs -r
+			if datasetexists $basefs; then
+				log_must zfs destroy -r $basefs
+			fi
 			basefs=${basefs%/*}
-			len=$(( ${#basefs} + 1 ))
+			len=$(echo $basefs| wc -c)
 		fi
 		break
 	fi

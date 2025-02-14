@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -49,7 +49,9 @@
 function cleanup
 {
 	for ds in $TESTPOOL/fs $TESTPOOL/fs-rename $TESTPOOL/fs-clone; do
-		datasetexists $ds && destroy_dataset $ds -rRf
+		if datasetexists $ds; then
+			log_must zfs destroy -rRf $ds
+		fi
 	done
 }
 

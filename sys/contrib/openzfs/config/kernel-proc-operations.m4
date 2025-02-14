@@ -7,14 +7,14 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_PROC_OPERATIONS], [
 	ZFS_LINUX_TEST_SRC([proc_ops_struct], [
 		#include <linux/proc_fs.h>
 
-		static int test_open(struct inode *ip, struct file *fp) { return 0; }
-		static ssize_t test_read(struct file *fp, char __user *ptr,
+		int test_open(struct inode *ip, struct file *fp) { return 0; }
+		ssize_t test_read(struct file *fp, char __user *ptr,
 		    size_t size, loff_t *offp) { return 0; }
-		static ssize_t test_write(struct file *fp, const char __user *ptr,
+		ssize_t test_write(struct file *fp, const char __user *ptr,
 		    size_t size, loff_t *offp) { return 0; }
-		static loff_t test_lseek(struct file *fp, loff_t off, int flag)
+		loff_t test_lseek(struct file *fp, loff_t off, int flag)
 		    { return 0; }
-		static int test_release(struct inode *ip, struct file *fp)
+		int test_release(struct inode *ip, struct file *fp)
 		    { return 0; }
 
 		const struct proc_ops test_ops __attribute__ ((unused)) = {

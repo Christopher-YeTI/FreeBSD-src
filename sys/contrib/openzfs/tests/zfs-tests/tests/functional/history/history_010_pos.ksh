@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,7 +47,7 @@ function cleanup
 {
 	del_user $HIST_USER
 	del_group $HIST_GROUP
-	datasetexists $root_testfs && destroy_dataset $root_testfs -rf
+	datasetexists $root_testfs && log_must zfs destroy -rf $root_testfs
 }
 
 log_assert "Verify internal long history information are correct."
@@ -66,8 +66,10 @@ add_user $HIST_GROUP $HIST_USER
 #
 # chmod 0750 $HOME
 #
-user_run $HIST_USER zfs list ||
-    log_unsupported "Test user $HIST_USER cannot execute zfs utilities"
+user_run $HIST_USER zfs list
+if [ $? -ne 0 ]; then
+        log_unsupported "Test user $HIST_USER cannot execute zfs utilities"
+fi
 
 run_and_verify "zfs create $root_testfs" "-l"
 run_and_verify "zfs allow $HIST_GROUP snapshot,mount $root_testfs" "-l"

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -46,11 +46,11 @@ verify_runnable "both"
 function cleanup
 {
 	datasetexists $TESTPOOL/$TESTFS2 && \
-		destroy_dataset $TESTPOOL/$TESTFS2 -r
+		log_must zfs destroy -r $TESTPOOL/$TESTFS2
 	datasetexists $TESTPOOL/$TESTFS2/newroot && \
-		destroy_dataset $TESTPOOL/$TESTFS2/newroot -r
+		log_must zfs destroy -r $TESTPOOL/$TESTFS2/newroot
 	datasetexists $TESTPOOL/$TESTFS2/child && \
-		destroy_dataset $TESTPOOL/$TESTFS2/child -r
+		log_must zfs destroy -r $TESTPOOL/$TESTFS2/child
 
 }
 log_onexit cleanup

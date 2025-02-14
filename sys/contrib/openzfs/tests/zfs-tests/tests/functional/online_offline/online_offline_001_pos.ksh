@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -54,7 +54,10 @@ function cleanup
 	#
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "online"
+		check_state $TESTPOOL $disk "online"
+		if [[ $? != 0 ]]; then
+			log_fail "Unable to online $disk"
+		fi
 
 	done
 
@@ -70,19 +73,24 @@ typeset killpid="$! "
 for disk in $DISKLIST; do
 	for i in 'do_offline' 'do_offline_while_already_offline'; do
 		log_must zpool offline $TESTPOOL $disk
-		log_must check_state $TESTPOOL $disk "offline"
+		check_state $TESTPOOL $disk "offline"
+		if [[ $? != 0 ]]; then
+			log_fail "$disk of $TESTPOOL is not offline."
+		fi
 	done
 
 	log_must zpool online $TESTPOOL $disk
-	log_must check_state $TESTPOOL $disk "online"
+	check_state $TESTPOOL $disk "online"
+	if [[ $? != 0 ]]; then
+		log_fail "$disk of $TESTPOOL did not match online state"
+	fi
 
 	# Delay for resilver to complete
 	sleep 3
 done
 
 log_must kill $killpid
-sync_all_pools
-log_must sync
+sync
 
 typeset dir=$(get_device_dir $DISKS)
 verify_filesys "$TESTPOOL" "$TESTPOOL/$TESTFS" "$dir"

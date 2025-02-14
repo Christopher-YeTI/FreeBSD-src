@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,7 +47,14 @@ verify_runnable "both"
 # Define uninherited properties and their short name.
 typeset props_str="type used available avail creation referenced refer \
 		compressratio ratio mounted origin quota reservation \
-		reserv volsize volblocksize volblock version canmount"
+		reserv volsize volblocksize volblock"
+
+zfs upgrade -v > /dev/null 2>&1
+if [[ $? -eq 0 ]]; then
+	props_str="$props_str version"
+fi
+
+set -A prop $props_str canmount
 
 
 log_assert "'zfs inherit' should return an error when attempting to inherit" \

@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: luaconf.h,v 1.176.1.2 2013/11/21 17:26:16 roberto Exp $
 ** Configuration file for Lua
@@ -554,3 +555,4 @@ extern int lcompat_hashnum(int64_t);
 #endif
 
 #endif
+/* END CSTYLED */

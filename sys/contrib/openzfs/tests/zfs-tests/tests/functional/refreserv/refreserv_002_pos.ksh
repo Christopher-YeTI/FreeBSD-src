@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -50,9 +50,11 @@ function cleanup
 	if is_global_zone ; then
 		log_must zfs set refreservation=none $TESTPOOL
 
-		datasetexists $TESTPOOL@snap && destroy_dataset $TESTPOOL@snap -f
+		if datasetexists $TESTPOOL@snap ; then
+			log_must zfs destroy -f $TESTPOOL@snap
+		fi
 	fi
-	destroy_dataset $TESTPOOL/$TESTFS -rf
+	log_must zfs destroy -rf $TESTPOOL/$TESTFS
 	log_must zfs create $TESTPOOL/$TESTFS
 	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 }
@@ -68,7 +70,8 @@ function max_refreserv
 
 	log_must zfs set refreserv=$rr $ds
 	while :; do
-		if zfs set refreserv=$((rr + incsize)) $ds >/dev/null 2>&1; then
+		zfs set refreserv=$((rr + incsize)) $ds >/dev/null 2>&1
+		if [[ $? == 0 ]]; then
 			((rr += incsize))
 			continue
 		else

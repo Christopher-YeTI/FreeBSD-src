@@ -6,7 +6,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -52,12 +52,14 @@ function run_and_verify
 	flags="$2"
 
 	if is_illumos; then
-		histcmd=$(echo $fullcmd | sed 's=/usr/sbin/==g')
+		histcmd=$(echo $fullcmd | sed 's/\/usr\/sbin\///g')
 	else
-		histcmd=$(echo $fullcmd | sed -E 's=^.*/(zpool|zfs)$=\1=')
+		histcmd=$(echo $fullcmd | sed 's/^.*\/\(zpool .*\).*$/\1/')
+		histcmd=$(echo $histcmd | sed 's/^.*\/\(zfs .*\).*$/\1/')
 	fi
 
-	read -r cmd subcmd _ <<<"$histcmd"
+	cmd=$(echo $histcmd | awk '{print $1}')
+	subcmd=$(echo $histcmd | awk '{print $2}')
 
 	# If we aren't running zpool or zfs, something is wrong
 	[[ $cmd == "zpool" || $cmd == "zfs" ]] || \
@@ -70,15 +72,16 @@ function run_and_verify
 	# Run the command as the specified user, and find the new history.
 	zpool history $flags $pool > $OLD_HISTORY 2>/dev/null
 	if [[ $user == "root" ]]; then
-		log_must_busy eval "$fullcmd"
+		log_must eval "$fullcmd"
 	else
-		log_must_busy user_run $user "$fullcmd"
+		log_must user_run $user "$fullcmd"
 	fi
 	zpool history $flags $pool > $TMP_HISTORY 2>/dev/null
-	diff $OLD_HISTORY $TMP_HISTORY | sed -n 's/^> //gp' > $NEW_HISTORY
+	diff $OLD_HISTORY $TMP_HISTORY | grep "^> " | sed 's/^> //g' \
+	    > $NEW_HISTORY
 
 	# Verify what's common to every case, regardless of zpool history flags.
-	grep -q "$histcmd" $NEW_HISTORY || \
+	grep "$histcmd" $NEW_HISTORY >/dev/null 2>&1 || \
 	    log_fail "Didn't find \"$histcmd\" in pool history"
 
 	# If 'zpool history' was called without any flags, then we're done.
@@ -113,7 +116,8 @@ function verify_long
 		suffix=":freebsd"
 	fi
 
-	if ! grep -q "$cmd \[user $uid ($user) on $hname$suffix\]" $NEW_HISTORY; then
+	grep -q "$cmd \[user $uid ($user) on $hname$suffix\]" $NEW_HISTORY
+	if [[ $? != 0 ]]; then
 		log_note "Couldn't find long information for \"$cmd\""
 		return 1
 	fi
@@ -129,8 +133,7 @@ function verify_hold
 
 	[[ $flags =~ "i" ]] || return 1
 
-	typeset tag _
-	read -r _ _ _ tag _ <<<"$cmd"
+	typeset tag=$(echo $cmd | awk '{print $4}')
 	typeset fullname=${cmd##* }
 	typeset dsname=${fullname%%@*}
 	typeset snapname=${fullname##*@}
@@ -138,7 +141,9 @@ function verify_hold
 	# This works whether or not the hold was recursive
 	for ds in $(zfs list -r -Ho name -t snapshot $dsname | \
 	    grep "@$snapname"); do
-		if ! grep -q "$subcmd $ds ([0-9]*) tag=$tag" $NEW_HISTORY; then
+		grep "$subcmd $ds ([0-9]*) tag=$tag" $NEW_HISTORY \
+		    >/dev/null 2>&1
+		if [[ $? != 0 ]]; then
 			log_note "Didn't find hold on $ds with $tag"
 			return 1
 		fi
@@ -167,12 +172,15 @@ function verify_rollback
 	typeset rb_fs=${dsname}/%rollback
 	typeset snapname=${fullname##*@}
 
-	if ! grep -q "clone swap $rb_fs ([0-9]*) parent=$parent_fs" $NEW_HISTORY ; then
+	grep "clone swap $rb_fs ([0-9]*) parent=$parent_fs" $NEW_HISTORY \
+	    >/dev/null 2>&1
+	if [[ $? != 0 ]]; then
 		log_note "Didn't find rollback clone swap in pool history"
 		return 1
 	fi
 
-	if ! grep -q "destroy $rb_fs" $NEW_HISTORY; then
+	grep "destroy $rb_fs" $NEW_HISTORY >/dev/null 2>&1
+	if [[ $? != 0 ]]; then
 		log_note "Didn't find rollback destroy in pool history"
 		return 1
 	fi
@@ -193,7 +201,9 @@ function verify_inherit
 
 	# This works whether or not the inherit was recursive
 	for ds in $(zfs list -r -Ho name -t filesystem $dsname); do
-		if ! grep -q "$subcmd $ds ([0-9]*) ${prop}=" $NEW_HISTORY; then
+		grep "$subcmd $ds ([0-9]*) ${prop}=" $NEW_HISTORY >/dev/null \
+		    2>&1
+		if [[ $? != 0 ]]; then
 			log_note "Didn't find inherit history for $ds"
 			return 1
 		fi
@@ -221,7 +231,8 @@ function verify_allow
 	# - Whether the operation applies locally or to descendent datasets (or
 	#   both)
 	#
-	echo $cmd | awk '$(NF - 1) ~ /@/ {exit 1}' || is_set=1
+	echo $cmd  | awk '{i = NF - 1; print $i}' | grep '@' >/dev/null \
+	    2>&1 && is_set=1
 	dsname=${cmd##* }
 	[[ $cmd =~ "-l " ]] && lflag=1
 	[[ $cmd =~ "-d " ]] && dflag=1
@@ -243,7 +254,9 @@ function verify_allow
 		[[ -n $is_set ]] && str="S-\$@"
 		tmp=${cmd#*@}
 		code="$str${tmp% *}"
-		if ! grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY; then
+		grep "permission $subcmd $dsname ([0-9]*) $code" \
+		    $NEW_HISTORY >/dev/null 2>&1
+		if [[ $? != 0 ]]; then
 			 log_note "Couldn't find $code in $NEW_HISTORY"
 			 return 1
 		 fi
@@ -252,7 +265,9 @@ function verify_allow
 		[[ -n $is_set ]] && str="C-\$"
 		tmp=${cmd#*-c}
 		code="$str${tmp% *}"
-		if ! grep "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY; then
+		grep "permission $subcmd $dsname ([0-9]*) $code" \
+		    $NEW_HISTORY >/dev/null 2>&1
+		if [ $? != 0 ]]; then
 			 log_note "Couldn't find $code in $NEW_HISTORY"
 			 return 1
 		fi
@@ -260,18 +275,22 @@ function verify_allow
 		str="u"
 		[[ -n $is_set ]] && str="U"
 		tmp=${cmd##*-u }
-		read -r _ opt _ <<<"$opt"
+		opt=$(echo $tmp | awk '{print $2}')
 		uid=$(id -u ${tmp%% *})
 		if [[ -n $lflag ]]; then
 			code="${str}l\$$uid $opt"
-			if grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY]; then
+			grep "permission $subcmd $dsname ([0-9]*) $code" \
+			    $NEW_HISTORY >/dev/null 2>&1
+			if [ $? != 0 ]]; then
 				 log_note "Couldn't find $code in $NEW_HISTORY"
 				 return 1
 			fi
 		fi
 		if [[ -n $dflag ]]; then
 			code="${str}d\$$uid $opt"
-			if grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY]; then
+			grep "permission $subcmd $dsname ([0-9]*) $code" \
+			    $NEW_HISTORY >/dev/null 2>&1
+			if [ $? != 0 ]]; then
 				 log_note "Couldn't find $code in $NEW_HISTORY"
 				 return 1
 			fi
@@ -280,18 +299,22 @@ function verify_allow
 		str="g"
 		[[ -n $is_set ]] && str="G"
 		tmp=${cmd##*-g }
-		read -r _ opt _ <<<"$opt"
+		opt=$(echo $tmp | awk '{print $2}')
 		gid=$(awk -F: "/^${tmp%% *}:/ {print \$3}" /etc/group)
 		if [[ -n $lflag ]]; then
 			code="${str}l\$$gid $opt"
-			if ! grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY; then
+			grep "permission $subcmd $dsname ([0-9]*) $code" \
+			    $NEW_HISTORY >/dev/null 2>&1
+			if [ $? != 0 ]]; then
 				 log_note "Couldn't find $code in $NEW_HISTORY"
 				 return 1
 			fi
 		fi
 		if [[ -n $dflag ]]; then
 			code="${str}d\$$gid $opt"
-			if ! grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY; then
+			grep "permission $subcmd $dsname ([0-9]*) $code" \
+			    $NEW_HISTORY >/dev/null 2>&1
+			if [ $? != 0 ]]; then
 				 log_note "Couldn't find $code in $NEW_HISTORY"
 				 return 1
 			fi
@@ -303,14 +326,18 @@ function verify_allow
 		opt=${opt%% *}
 		if [[ -n $lflag ]]; then
 			code="${str}l\$ $opt"
-			if ! grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY; then
+			grep "permission $subcmd $dsname ([0-9]*) $code" \
+			    $NEW_HISTORY >/dev/null 2>&1
+			if [ $? != 0 ]]; then
 				 log_note "Couldn't find $code in $NEW_HISTORY"
 				 return 1
 			fi
 		fi
 		if [[ -n $dflag ]]; then
 			code="${str}d\$ $opt"
-			if ! grep -q "permission $subcmd $dsname ([0-9]*) $code" $NEW_HISTORY; then
+			grep "permission $subcmd $dsname ([0-9]*) $code" \
+			    $NEW_HISTORY >/dev/null 2>&1
+			if [ $? != 0 ]]; then
 				 log_note "Couldn't find $code in $NEW_HISTORY"
 				 return 1
 			fi
@@ -346,14 +373,16 @@ function verify_destroy
 	[[ $dsname =~ "@" ]] && typeset is_snap=1
 
 	if [[ -n $is_snap ]]; then
-		if ! grep -q "ioctl destroy_snaps" $NEW_HISTORY; then
+		grep "ioctl destroy_snaps" $NEW_HISTORY >/dev/null 2>&1
+		if [[ $? != 0 ]]; then
 			log_note "Didn't find ioctl while destroying $dsname"
 			return 1
 		fi
 	fi
 
 	# This should be present for datasets and snapshots alike
-	if ! grep -q "destroy $dsname" $NEW_HISTORY; then
+	grep "destroy $dsname" $NEW_HISTORY >/dev/null 2>&1
+	if [[ $? != 0 ]]; then
 		log_note "Didn't find \"destroy\" for $dsname"
 		return 1
 	fi
@@ -372,7 +401,9 @@ function verify_snapshot
 	typeset dsname=${fullname%%@*}
 	typeset snapname=${fullname##*@}
 
-	if ! grep -q "\[txg:[0-9]*\] $subcmd $fullname ([0-9]*)" $NEW_HISTORY; then
+	grep "\[txg:[0-9]*\] $subcmd $fullname ([0-9]*)" $NEW_HISTORY \
+	    >/dev/null 2>&1
+	if [[ $? != 0 ]]; then
 		log_note "Didn't find snapshot command for $fullname"
 		return 1
 	fi
@@ -380,7 +411,8 @@ function verify_snapshot
 	# This works whether or not the snapshot was recursive
 	for ds in $(zfs list -r -Ho name -t snapshot $dsname | \
 	    grep "@$snapname"); do
-		if ! grep -q "^[ ]* $ds$" $NEW_HISTORY; then
+		grep "^[ ]* $ds$" $NEW_HISTORY >/dev/null 2>&1
+		if [[ $? != 0 ]]; then
 			log_note "Didn't find \"ioctl snapshot\" for $ds"
 			return 1
 		fi

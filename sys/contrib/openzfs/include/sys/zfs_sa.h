@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -91,7 +91,8 @@ typedef enum zpl_attr {
 #define	SA_FLAGS_OFFSET		48
 #define	SA_PROJID_OFFSET	128
 
-extern const sa_attr_reg_t zfs_attr_table[ZPL_END + 1];
+extern sa_attr_reg_t zfs_attr_table[ZPL_END + 1];
+extern sa_attr_reg_t zfs_legacy_attr_table[ZPL_END + 1];
 
 /*
  * This is a deprecated data structure that only exists for
@@ -138,7 +139,7 @@ void zfs_sa_symlink(struct znode *, char *link, int len, dmu_tx_t *);
 void zfs_sa_get_scanstamp(struct znode *, xvattr_t *);
 void zfs_sa_set_scanstamp(struct znode *, xvattr_t *, dmu_tx_t *);
 int zfs_sa_get_xattr(struct znode *);
-int zfs_sa_set_xattr(struct znode *, const char *, const void *, size_t);
+int zfs_sa_set_xattr(struct znode *);
 void zfs_sa_upgrade(struct sa_handle  *, dmu_tx_t *);
 void zfs_sa_upgrade_txholds(dmu_tx_t *, struct znode *);
 void zfs_sa_init(void);

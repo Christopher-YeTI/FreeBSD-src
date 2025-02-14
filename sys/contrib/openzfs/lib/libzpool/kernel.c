@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -31,8 +31,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
-#include <libzutil.h>
 #include <sys/crypto/icp.h>
 #include <sys/processor.h>
 #include <sys/rrwlock.h>
@@ -54,7 +52,7 @@
  */
 
 uint64_t physmem;
-uint32_t hostid;
+char hw_serial[HW_HOSTID_LEN];
 struct utsname hw_utsname;
 
 /* If set, all blocks read will be copied to the specified directory. */
@@ -76,29 +74,13 @@ struct proc p0;
 #define	TS_STACK_MIN	MAX(PTHREAD_STACK_MIN, 32768)
 #define	TS_STACK_MAX	(256 * 1024)
 
-struct zk_thread_wrapper {
-	void (*func)(void *);
-	void *arg;
-};
-
-static void *
-zk_thread_wrapper(void *arg)
-{
-	struct zk_thread_wrapper ztw;
-	memcpy(&ztw, arg, sizeof (ztw));
-	free(arg);
-	ztw.func(ztw.arg);
-	return (NULL);
-}
-
+/*ARGSUSED*/
 kthread_t *
-zk_thread_create(const char *name, void (*func)(void *), void *arg,
-    size_t stksize, int state)
+zk_thread_create(void (*func)(void *), void *arg, size_t stksize, int state)
 {
 	pthread_attr_t attr;
 	pthread_t tid;
 	char *stkstr;
-	struct zk_thread_wrapper *ztw;
 	int detachstate = PTHREAD_CREATE_DETACHED;
 
 	VERIFY0(pthread_attr_init(&attr));
@@ -135,13 +117,8 @@ zk_thread_create(const char *name, void (*func)(void *), void *arg,
 	VERIFY0(pthread_attr_setstacksize(&attr, stksize));
 	VERIFY0(pthread_attr_setguardsize(&attr, PAGESIZE));
 
-	VERIFY(ztw = malloc(sizeof (*ztw)));
-	ztw->func = func;
-	ztw->arg = arg;
-	VERIFY0(pthread_create(&tid, &attr, zk_thread_wrapper, ztw));
+	VERIFY0(pthread_create(&tid, &attr, (void *(*)(void *))func, arg));
 	VERIFY0(pthread_attr_destroy(&attr));
-
-	pthread_setname_np(tid, name);
 
 	return ((void *)(uintptr_t)tid);
 }
@@ -151,35 +128,30 @@ zk_thread_create(const char *name, void (*func)(void *), void *arg,
  * kstats
  * =========================================================================
  */
+/*ARGSUSED*/
 kstat_t *
 kstat_create(const char *module, int instance, const char *name,
     const char *class, uchar_t type, ulong_t ndata, uchar_t ks_flag)
 {
-	(void) module, (void) instance, (void) name, (void) class, (void) type,
-	    (void) ndata, (void) ks_flag;
 	return (NULL);
 }
 
+/*ARGSUSED*/
 void
 kstat_install(kstat_t *ksp)
-{
-	(void) ksp;
-}
+{}
 
+/*ARGSUSED*/
 void
 kstat_delete(kstat_t *ksp)
-{
-	(void) ksp;
-}
+{}
 
 void
 kstat_set_raw_ops(kstat_t *ksp,
     int (*headers)(char *buf, size_t size),
     int (*data)(char *buf, size_t size, void *data),
     void *(*addr)(kstat_t *ksp, loff_t index))
-{
-	(void) ksp, (void) headers, (void) data, (void) addr;
-}
+{}
 
 /*
  * =========================================================================
@@ -190,7 +162,6 @@ kstat_set_raw_ops(kstat_t *ksp,
 void
 mutex_init(kmutex_t *mp, char *name, int type, void *cookie)
 {
-	(void) name, (void) type, (void) cookie;
 	VERIFY0(pthread_mutex_init(&mp->m_lock, NULL));
 	memset(&mp->m_owner, 0, sizeof (pthread_t));
 }
@@ -209,18 +180,11 @@ mutex_enter(kmutex_t *mp)
 }
 
 int
-mutex_enter_check_return(kmutex_t *mp)
-{
-	int error = pthread_mutex_lock(&mp->m_lock);
-	if (error == 0)
-		mp->m_owner = pthread_self();
-	return (error);
-}
-
-int
 mutex_tryenter(kmutex_t *mp)
 {
-	int error = pthread_mutex_trylock(&mp->m_lock);
+	int error;
+
+	error = pthread_mutex_trylock(&mp->m_lock);
 	if (error == 0) {
 		mp->m_owner = pthread_self();
 		return (1);
@@ -246,7 +210,6 @@ mutex_exit(kmutex_t *mp)
 void
 rw_init(krwlock_t *rwlp, char *name, int type, void *arg)
 {
-	(void) name, (void) type, (void) arg;
 	VERIFY0(pthread_rwlock_init(&rwlp->rw_lock, NULL));
 	rwlp->rw_readers = 0;
 	rwlp->rw_owner = 0;
@@ -305,20 +268,19 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 	return (0);
 }
 
+/* ARGSUSED */
 uint32_t
 zone_get_hostid(void *zonep)
 {
 	/*
 	 * We're emulating the system's hostid in userland.
 	 */
-	(void) zonep;
-	return (hostid);
+	return (strtoul(hw_serial, NULL, 10));
 }
 
 int
 rw_tryupgrade(krwlock_t *rwlp)
 {
-	(void) rwlp;
 	return (0);
 }
 
@@ -331,7 +293,6 @@ rw_tryupgrade(krwlock_t *rwlp)
 void
 cv_init(kcondvar_t *cv, char *name, int type, void *arg)
 {
-	(void) name, (void) type, (void) arg;
 	VERIFY0(pthread_cond_init(cv, NULL));
 }
 
@@ -389,11 +350,11 @@ cv_timedwait(kcondvar_t *cv, kmutex_t *mp, clock_t abstime)
 	return (1);
 }
 
+/*ARGSUSED*/
 int
 cv_timedwait_hires(kcondvar_t *cv, kmutex_t *mp, hrtime_t tim, hrtime_t res,
     int flag)
 {
-	(void) res;
 	int error;
 	struct timeval tv;
 	struct timespec ts;
@@ -449,9 +410,7 @@ cv_broadcast(kcondvar_t *cv)
 
 void
 seq_printf(struct seq_file *m, const char *fmt, ...)
-{
-	(void) m, (void) fmt;
-}
+{}
 
 void
 procfs_list_install(const char *module,
@@ -464,8 +423,6 @@ procfs_list_install(const char *module,
     int (*clear)(procfs_list_t *procfs_list),
     size_t procfs_list_node_off)
 {
-	(void) module, (void) submodule, (void) name, (void) mode, (void) show,
-	    (void) show_header, (void) clear;
 	mutex_init(&procfs_list->pl_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&procfs_list->pl_list,
 	    procfs_list_node_off + sizeof (procfs_list_node_t),
@@ -476,9 +433,7 @@ procfs_list_install(const char *module,
 
 void
 procfs_list_uninstall(procfs_list_t *procfs_list)
-{
-	(void) procfs_list;
-}
+{}
 
 void
 procfs_list_destroy(procfs_list_t *procfs_list)
@@ -586,10 +541,19 @@ void
 __dprintf(boolean_t dprint, const char *file, const char *func,
     int line, const char *fmt, ...)
 {
-	/* Get rid of annoying "../common/" prefix to filename. */
-	const char *newfile = zfs_basename(file);
-
+	const char *newfile;
 	va_list adx;
+
+	/*
+	 * Get rid of annoying "../common/" prefix to filename.
+	 */
+	newfile = strrchr(file, '/');
+	if (newfile != NULL) {
+		newfile = newfile + 1; /* Get rid of leading / */
+	} else {
+		newfile = file;
+	}
+
 	if (dprint) {
 		/* dprintf messages are printed immediately */
 
@@ -646,7 +610,7 @@ __dprintf(boolean_t dprint, const char *file, const char *func,
 static char ce_prefix[CE_IGNORE][10] = { "", "NOTICE: ", "WARNING: ", "" };
 static char ce_suffix[CE_IGNORE][2] = { "", "\n", "\n", "" };
 
-__attribute__((noreturn)) void
+void
 vpanic(const char *fmt, va_list adx)
 {
 	(void) fprintf(stderr, "error: ");
@@ -656,7 +620,7 @@ vpanic(const char *fmt, va_list adx)
 	abort();	/* think of it as a "user-level crash dump" */
 }
 
-__attribute__((noreturn)) void
+void
 panic(const char *fmt, ...)
 {
 	va_list adx;
@@ -678,6 +642,7 @@ vcmn_err(int ce, const char *fmt, va_list adx)
 	}
 }
 
+/*PRINTFLIKE2*/
 void
 cmn_err(int ce, const char *fmt, ...)
 {
@@ -780,10 +745,22 @@ random_get_pseudo_bytes(uint8_t *ptr, size_t len)
 }
 
 int
+ddi_strtoul(const char *hw_serial, char **nptr, int base, unsigned long *result)
+{
+	char *end;
+
+	*result = strtoul(hw_serial, &end, base);
+	if (*result == 0)
+		return (errno);
+	return (0);
+}
+
+int
 ddi_strtoull(const char *str, char **nptr, int base, u_longlong_t *result)
 {
-	errno = 0;
-	*result = strtoull(str, nptr, base);
+	char *end;
+
+	*result = strtoull(str, &end, base);
 	if (*result == 0)
 		return (errno);
 	return (0);
@@ -822,7 +799,8 @@ kernel_init(int mode)
 	dprintf("physmem = %llu pages (%.2f GB)\n", (u_longlong_t)physmem,
 	    (double)physmem * sysconf(_SC_PAGE_SIZE) / (1ULL << 30));
 
-	hostid = (mode & SPA_MODE_WRITE) ? get_system_hostid() : 0;
+	(void) snprintf(hw_serial, sizeof (hw_serial), "%ld",
+	    (mode & SPA_MODE_WRITE) ? get_system_hostid() : 0);
 
 	random_init();
 
@@ -857,70 +835,60 @@ kernel_fini(void)
 uid_t
 crgetuid(cred_t *cr)
 {
-	(void) cr;
 	return (0);
 }
 
 uid_t
 crgetruid(cred_t *cr)
 {
-	(void) cr;
 	return (0);
 }
 
 gid_t
 crgetgid(cred_t *cr)
 {
-	(void) cr;
 	return (0);
 }
 
 int
 crgetngroups(cred_t *cr)
 {
-	(void) cr;
 	return (0);
 }
 
 gid_t *
 crgetgroups(cred_t *cr)
 {
-	(void) cr;
 	return (NULL);
 }
 
 int
 zfs_secpolicy_snapshot_perms(const char *name, cred_t *cr)
 {
-	(void) name, (void) cr;
 	return (0);
 }
 
 int
 zfs_secpolicy_rename_perms(const char *from, const char *to, cred_t *cr)
 {
-	(void) from, (void) to, (void) cr;
 	return (0);
 }
 
 int
 zfs_secpolicy_destroy_perms(const char *name, cred_t *cr)
 {
-	(void) name, (void) cr;
 	return (0);
 }
 
 int
 secpolicy_zfs(const cred_t *cr)
 {
-	(void) cr;
 	return (0);
 }
 
 int
 secpolicy_zfs_proc(const cred_t *cr, proc_t *proc)
 {
-	(void) cr, (void) proc;
 	return (0);
 }
 
@@ -967,54 +935,25 @@ kmem_asprintf(const char *fmt, ...)
 	return (buf);
 }
 
-/*
- * kmem_scnprintf() will return the number of characters that it would have
- * printed whenever it is limited by value of the size variable, rather than
- * the number of characters that it did print. This can cause misbehavior on
- * subsequent uses of the return value, so we define a safe version that will
- * return the number of characters actually printed, minus the NULL format
- * character.  Subsequent use of this by the safe string functions is safe
- * whether it is snprintf(), strlcat() or strlcpy().
- */
-int
-kmem_scnprintf(char *restrict str, size_t size, const char *restrict fmt, ...)
-{
-	int n;
-	va_list ap;
-
-	/* Make the 0 case a no-op so that we do not return -1 */
-	if (size == 0)
-		return (0);
-
-	va_start(ap, fmt);
-	n = vsnprintf(str, size, fmt, ap);
-	va_end(ap);
-
-	if (n >= size)
-		n = size - 1;
-
-	return (n);
-}
-
+/* ARGSUSED */
 zfs_file_t *
 zfs_onexit_fd_hold(int fd, minor_t *minorp)
 {
-	(void) fd;
 	*minorp = 0;
 	return (NULL);
 }
 
+/* ARGSUSED */
 void
 zfs_onexit_fd_rele(zfs_file_t *fp)
 {
-	(void) fp;
 }
 
+/* ARGSUSED */
 int
 zfs_onexit_add_cb(minor_t minor, void (*func)(void *), void *data,
-    uintptr_t *action_handle)
+    uint64_t *action_handle)
 {
-	(void) minor, (void) func, (void) data, (void) action_handle;
 	return (0);
 }
 
@@ -1027,7 +966,6 @@ spl_fstrans_mark(void)
 void
 spl_fstrans_unmark(fstrans_cookie_t cookie)
 {
-	(void) cookie;
 }
 
 int
@@ -1042,29 +980,27 @@ kmem_cache_reap_active(void)
 	return (0);
 }
 
+void *zvol_tag = "zvol_tag";
+
 void
 zvol_create_minor(const char *name)
 {
-	(void) name;
 }
 
 void
 zvol_create_minors_recursive(const char *name)
 {
-	(void) name;
 }
 
 void
 zvol_remove_minors(spa_t *spa, const char *name, boolean_t async)
 {
-	(void) spa, (void) name, (void) async;
 }
 
 void
 zvol_rename_minors(spa_t *spa, const char *oldname, const char *newname,
     boolean_t async)
 {
-	(void) spa, (void) oldname, (void) newname, (void) async;
 }
 
 /*
@@ -1104,7 +1040,7 @@ zfs_file_open(const char *path, int flags, int mode, zfs_file_t **fpp)
 
 	if (vn_dumpdir != NULL) {
 		char *dumppath = umem_zalloc(MAXPATHLEN, UMEM_NOFAIL);
-		const char *inpath = zfs_basename(path);
+		char *inpath = basename((char *)(uintptr_t)path);
 
 		(void) snprintf(dumppath, MAXPATHLEN,
 		    "%s/%s", vn_dumpdir, inpath);
@@ -1358,41 +1294,33 @@ zfs_file_getattr(zfs_file_t *fp, zfs_file_attr_t *zfattr)
 int
 zfs_file_fsync(zfs_file_t *fp, int flags)
 {
-	(void) flags;
+	int rc;
 
-	if (fsync(fp->f_fd) < 0)
+	rc = fsync(fp->f_fd);
+	if (rc < 0)
 		return (errno);
 
 	return (0);
 }
 
 /*
- * deallocate - zero and/or deallocate file storage
+ * fallocate - allocate or free space on disk
  *
  * fp - file pointer
- * offset - offset to start zeroing or deallocating
- * len - length to zero or deallocate
+ * mode (non-standard options for hole punching etc)
+ * offset - offset to start allocating or freeing from
+ * len - length to free / allocate
+ *
+ * OPTIONAL
  */
 int
-zfs_file_deallocate(zfs_file_t *fp, loff_t offset, loff_t len)
+zfs_file_fallocate(zfs_file_t *fp, int mode, loff_t offset, loff_t len)
 {
-	int rc;
-#if defined(__linux__)
-	rc = fallocate(fp->f_fd,
-	    FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, offset, len);
-#elif defined(__FreeBSD__) && (__FreeBSD_version >= 1400029)
-	struct spacectl_range rqsr = {
-		.r_offset = offset,
-		.r_len = len,
-	};
-	rc = fspacectl(fp->f_fd, SPACECTL_DEALLOC, &rqsr, 0, &rqsr);
+#ifdef __linux__
+	return (fallocate(fp->f_fd, mode, offset, len));
 #else
-	(void) fp, (void) offset, (void) len;
-	rc = EOPNOTSUPP;
+	return (EOPNOTSUPP);
 #endif
-	if (rc)
-		return (SET_ERROR(rc));
-	return (0);
 }
 
 /*
@@ -1434,8 +1362,8 @@ zfs_file_unlink(const char *path)
 zfs_file_t *
 zfs_file_get(int fd)
 {
-	(void) fd;
 	abort();
+
 	return (NULL);
 }
 /*
@@ -1449,35 +1377,9 @@ void
 zfs_file_put(zfs_file_t *fp)
 {
 	abort();
-	(void) fp;
 }
 
 void
 zfsvfs_update_fromname(const char *oldname, const char *newname)
 {
-	(void) oldname, (void) newname;
-}
-
-void
-spa_import_os(spa_t *spa)
-{
-	(void) spa;
-}
-
-void
-spa_export_os(spa_t *spa)
-{
-	(void) spa;
-}
-
-void
-spa_activate_os(spa_t *spa)
-{
-	(void) spa;
-}
-
-void
-spa_deactivate_os(spa_t *spa)
-{
-	(void) spa;
 }

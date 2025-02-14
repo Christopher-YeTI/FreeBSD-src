@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -199,7 +199,7 @@ spa_history_log_notify(spa_t *spa, nvlist_t *nvl)
 {
 	nvlist_t *hist_nvl = fnvlist_alloc();
 	uint64_t uint64;
-	const char *string;
+	char *string;
 
 	if (nvlist_lookup_string(nvl, ZPOOL_HIST_CMD, &string) == 0)
 		fnvlist_add_string(hist_nvl, ZFS_EV_HIST_CMD, string);
@@ -248,6 +248,7 @@ spa_history_log_notify(spa_t *spa, nvlist_t *nvl)
 /*
  * Write out a history event.
  */
+/*ARGSUSED*/
 static void
 spa_history_log_sync(void *arg, dmu_tx_t *tx)
 {
@@ -390,9 +391,6 @@ spa_history_log_nvl(spa_t *spa, nvlist_t *nvl)
 		return (err);
 	}
 
-	ASSERT3UF(tx->tx_txg, <=, spa_final_dirty_txg(spa),
-	    "Logged %s after final txg was set!", "nvlist");
-
 	VERIFY0(nvlist_dup(nvl, &nvarg, KM_SLEEP));
 	if (spa_history_zone() != NULL) {
 		fnvlist_add_string(nvarg, ZPOOL_HIST_ZONE,
@@ -529,9 +527,6 @@ log_internal(nvlist_t *nvl, const char *operation, spa_t *spa,
 		fnvlist_free(nvl);
 		return;
 	}
-
-	ASSERT3UF(tx->tx_txg, <=, spa_final_dirty_txg(spa),
-	    "Logged after final txg was set: %s %s", operation, fmt);
 
 	msg = kmem_vasprintf(fmt, adx);
 	fnvlist_add_string(nvl, ZPOOL_HIST_INT_STR, msg);

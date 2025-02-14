@@ -76,8 +76,9 @@ get_objset_type(dsl_dataset_t *ds, zfs_type_t *type)
 static int
 get_objset_type_name(dsl_dataset_t *ds, char *str)
 {
-	zfs_type_t type = ZFS_TYPE_INVALID;
-	int error = get_objset_type(ds, &type);
+	int error;
+	zfs_type_t type;
+	error = get_objset_type(ds, &type);
 	if (error != 0)
 		return (error);
 	switch (type) {
@@ -229,7 +230,7 @@ get_special_prop(lua_State *state, dsl_dataset_t *ds, const char *dsname,
 	char *strval = kmem_alloc(ZAP_MAXVALUELEN, KM_SLEEP);
 	char setpoint[ZFS_MAX_DATASET_NAME_LEN] =
 	    "Internal error - setpoint not determined";
-	zfs_type_t ds_type = ZFS_TYPE_INVALID;
+	zfs_type_t ds_type;
 	zprop_type_t prop_type = zfs_prop_get_type(zfs_prop);
 	(void) get_objset_type(ds, &ds_type);
 
@@ -343,13 +344,19 @@ get_special_prop(lua_State *state, dsl_dataset_t *ds, const char *dsname,
 		}
 		break;
 	case ZFS_PROP_RECEIVE_RESUME_TOKEN: {
-		char *token = get_receive_resume_token(ds);
-		if (token != NULL) {
-			(void) strlcpy(strval, token, ZAP_MAXVALUELEN);
-			kmem_strfree(token);
-		} else {
-			error = ENOENT;
+		char *token = get_receive_resume_stats_impl(ds);
+
+		(void) strlcpy(strval, token, ZAP_MAXVALUELEN);
+		if (strcmp(strval, "") == 0) {
+			char *childval = get_child_receive_stats(ds);
+
+			(void) strlcpy(strval, childval, ZAP_MAXVALUELEN);
+			if (strcmp(strval, "") == 0)
+				error = ENOENT;
+
+			kmem_strfree(childval);
 		}
+		kmem_strfree(token);
 		break;
 	}
 	case ZFS_PROP_VOLSIZE:
@@ -391,7 +398,7 @@ get_special_prop(lua_State *state, dsl_dataset_t *ds, const char *dsname,
 		dsl_dataset_crypt_stats(ds, nvl);
 		if (nvlist_lookup_nvlist(nvl, zfs_prop_to_name(zfs_prop),
 		    &propval) == 0) {
-			const char *source;
+			char *source;
 
 			(void) nvlist_lookup_uint64(propval, ZPROP_VALUE,
 			    &numval);
@@ -402,10 +409,6 @@ get_special_prop(lua_State *state, dsl_dataset_t *ds, const char *dsname,
 		nvlist_free(nvl);
 		break;
 	}
-
-	case ZFS_PROP_SNAPSHOTS_CHANGED:
-		numval = dsl_dir_snap_cmtime(ds->ds_dir).tv_sec;
-		break;
 
 	default:
 		/* Did not match these props, check in the dsl_dir */
@@ -467,13 +470,11 @@ get_zap_prop(lua_State *state, dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 	} else {
 		error = dsl_prop_get_ds(ds, prop_name, sizeof (numval),
 		    1, &numval, setpoint);
-		if (error != 0)
-			goto out;
+
 #ifdef _KERNEL
 		/* Fill in temporary value for prop, if applicable */
 		(void) zfs_get_temporary_prop(ds, zfs_prop, &numval, setpoint);
 #else
-		kmem_free(strval, ZAP_MAXVALUELEN);
 		return (luaL_error(state,
 		    "temporary properties only supported in kernel mode",
 		    prop_name));
@@ -490,7 +491,6 @@ get_zap_prop(lua_State *state, dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 				(void) lua_pushnumber(state, numval);
 		}
 	}
-out:
 	kmem_free(strval, ZAP_MAXVALUELEN);
 	if (error == 0)
 		get_prop_src(state, setpoint, zfs_prop);
@@ -503,7 +503,8 @@ out:
 boolean_t
 prop_valid_for_ds(dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 {
-	zfs_type_t zfs_type = ZFS_TYPE_INVALID;
+	int error;
+	zfs_type_t zfs_type;
 
 	/* properties not supported */
 	if ((zfs_prop == ZFS_PROP_ISCSIOPTIONS) ||
@@ -514,7 +515,7 @@ prop_valid_for_ds(dsl_dataset_t *ds, zfs_prop_t zfs_prop)
 	if ((zfs_prop == ZFS_PROP_ORIGIN) && (!dsl_dir_is_clone(ds->ds_dir)))
 		return (B_FALSE);
 
-	int error = get_objset_type(ds, &zfs_type);
+	error = get_objset_type(ds, &zfs_type);
 	if (error != 0)
 		return (B_FALSE);
 	return (zfs_prop_valid_for_type(zfs_prop, zfs_type, B_FALSE));
@@ -610,7 +611,8 @@ parse_userquota_prop(const char *prop_name, zfs_userquota_prop_t *type,
 		 */
 		int domain_len = strrchr(cp, '-') - cp;
 		domain_val = kmem_alloc(domain_len + 1, KM_SLEEP);
-		(void) strlcpy(domain_val, cp, domain_len + 1);
+		(void) strncpy(domain_val, cp, domain_len);
+		domain_val[domain_len] = '\0';
 		cp += domain_len + 1;
 
 		(void) ddi_strtoll(cp, &end, 10, (longlong_t *)rid);
@@ -741,12 +743,12 @@ zcp_get_written_prop(lua_State *state, dsl_pool_t *dp,
 }
 
 static int zcp_get_prop(lua_State *state);
-static const zcp_lib_info_t zcp_get_prop_info = {
+static zcp_lib_info_t zcp_get_prop_info = {
 	.name = "get_prop",
 	.func = zcp_get_prop,
 	.pargs = {
-	    { .za_name = "dataset", .za_lua_type = LUA_TSTRING },
-	    { .za_name = "property", .za_lua_type =  LUA_TSTRING },
+	    { .za_name = "dataset", .za_lua_type = LUA_TSTRING},
+	    { .za_name = "property", .za_lua_type =  LUA_TSTRING},
 	    {NULL, 0}
 	},
 	.kwargs = {
@@ -760,7 +762,7 @@ zcp_get_prop(lua_State *state)
 	const char *dataset_name;
 	const char *property_name;
 	dsl_pool_t *dp = zcp_run_info(state)->zri_pool;
-	const zcp_lib_info_t *libinfo = &zcp_get_prop_info;
+	zcp_lib_info_t *libinfo = &zcp_get_prop_info;
 
 	zcp_parse_args(state, libinfo->name, libinfo->pargs, libinfo->kwargs);
 

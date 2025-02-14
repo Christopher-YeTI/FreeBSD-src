@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -60,10 +60,14 @@ while [ $i -lt "${#properties[@]}" ]
 do
 	log_note "Checking for ${properties[$i]} property"
 	log_must eval "zpool get ${properties[$i]} $TESTPOOL > $values"
-	log_must grep -q "${properties[$i]}" $values
-
+	grep "${properties[$i]}" $values > /dev/null 2>&1
+	if [ $? -ne 0 ]
+	then
+		log_fail "${properties[$i]} not seen in output"
+	fi
+	grep "^NAME " $values > /dev/null 2>&1
 	# only need to check this once.
-	if [ $i -eq 0 ] && ! grep -q "^NAME " $values
+	if [ $i -eq 0 ] && [ $? -ne 0 ]
 	then
 		log_fail "Header not seen in zpool get output"
 	fi

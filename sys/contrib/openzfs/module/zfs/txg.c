@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -108,10 +108,10 @@
  * now transition to the syncing state.
  */
 
-static __attribute__((noreturn)) void txg_sync_thread(void *arg);
-static __attribute__((noreturn)) void txg_quiesce_thread(void *arg);
+static void txg_sync_thread(void *arg);
+static void txg_quiesce_thread(void *arg);
 
-uint_t zfs_txg_timeout = 5;	/* max seconds worth of delta per txg */
+int zfs_txg_timeout = 5;	/* max seconds worth of delta per txg */
 
 /*
  * Prepare the txg subsystem.
@@ -121,7 +121,7 @@ txg_init(dsl_pool_t *dp, uint64_t txg)
 {
 	tx_state_t *tx = &dp->dp_tx;
 	int c;
-	memset(tx, 0, sizeof (tx_state_t));
+	bzero(tx, sizeof (tx_state_t));
 
 	tx->tx_cpu = vmem_zalloc(max_ncpus * sizeof (tx_cpu_t), KM_SLEEP);
 
@@ -186,7 +186,7 @@ txg_fini(dsl_pool_t *dp)
 
 	vmem_free(tx->tx_cpu, max_ncpus * sizeof (tx_cpu_t));
 
-	memset(tx, 0, sizeof (tx_state_t));
+	bzero(tx, sizeof (tx_state_t));
 }
 
 /*
@@ -429,7 +429,7 @@ txg_quiesce(dsl_pool_t *dp, uint64_t txg)
 }
 
 static void
-txg_do_callbacks(void *cb_list)
+txg_do_callbacks(list_t *cb_list)
 {
 	dmu_tx_do_callbacks(cb_list, 0);
 
@@ -479,7 +479,7 @@ txg_dispatch_callbacks(dsl_pool_t *dp, uint64_t txg)
 
 		list_move_tail(cb_list, &tc->tc_callbacks[g]);
 
-		(void) taskq_dispatch(tx->tx_commit_cb_taskq,
+		(void) taskq_dispatch(tx->tx_commit_cb_taskq, (task_func_t *)
 		    txg_do_callbacks, cb_list, TQ_SLEEP);
 	}
 }
@@ -499,6 +499,14 @@ txg_wait_callbacks(dsl_pool_t *dp)
 }
 
 static boolean_t
+txg_is_syncing(dsl_pool_t *dp)
+{
+	tx_state_t *tx = &dp->dp_tx;
+	ASSERT(MUTEX_HELD(&tx->tx_sync_lock));
+	return (tx->tx_syncing_txg != 0);
+}
+
+static boolean_t
 txg_is_quiescing(dsl_pool_t *dp)
 {
 	tx_state_t *tx = &dp->dp_tx;
@@ -514,7 +522,7 @@ txg_has_quiesced_to_sync(dsl_pool_t *dp)
 	return (tx->tx_quiesced_txg != 0);
 }
 
-static __attribute__((noreturn)) void
+static void
 txg_sync_thread(void *arg)
 {
 	dsl_pool_t *dp = arg;
@@ -531,6 +539,8 @@ txg_sync_thread(void *arg)
 		clock_t timeout = zfs_txg_timeout * hz;
 		clock_t timer;
 		uint64_t txg;
+		uint64_t dirty_min_bytes =
+		    zfs_dirty_data_max * zfs_dirty_data_sync_percent / 100;
 
 		/*
 		 * We sync when we're scanning, there's someone waiting
@@ -541,7 +551,8 @@ txg_sync_thread(void *arg)
 		while (!dsl_scan_active(dp->dp_scan) &&
 		    !tx->tx_exiting && timer > 0 &&
 		    tx->tx_synced_txg >= tx->tx_sync_txg_waiting &&
-		    !txg_has_quiesced_to_sync(dp)) {
+		    !txg_has_quiesced_to_sync(dp) &&
+		    dp->dp_dirty_total < dirty_min_bytes) {
 			dprintf("waiting; tx_synced=%llu waiting=%llu dp=%p\n",
 			    (u_longlong_t)tx->tx_synced_txg,
 			    (u_longlong_t)tx->tx_sync_txg_waiting, dp);
@@ -551,24 +562,10 @@ txg_sync_thread(void *arg)
 		}
 
 		/*
-		 * When we're suspended, nothing should be changing and for
-		 * MMP we don't want to bump anything that would make it
-		 * harder to detect if another host is changing it when
-		 * resuming after a MMP suspend.
-		 */
-		if (spa_suspended(spa))
-			continue;
-
-		/*
 		 * Wait until the quiesce thread hands off a txg to us,
 		 * prompting it to do so if necessary.
 		 */
 		while (!tx->tx_exiting && !txg_has_quiesced_to_sync(dp)) {
-			if (txg_is_quiescing(dp)) {
-				txg_thread_wait(tx, &cpr,
-				    &tx->tx_quiesce_done_cv, 0);
-				continue;
-			}
 			if (tx->tx_quiesce_txg_waiting < tx->tx_open_txg+1)
 				tx->tx_quiesce_txg_waiting = tx->tx_open_txg+1;
 			cv_broadcast(&tx->tx_quiesce_more_cv);
@@ -614,7 +611,7 @@ txg_sync_thread(void *arg)
 	}
 }
 
-static __attribute__((noreturn)) void
+static void
 txg_quiesce_thread(void *arg)
 {
 	dsl_pool_t *dp = arg;
@@ -794,22 +791,24 @@ txg_wait_open(dsl_pool_t *dp, uint64_t txg, boolean_t should_quiesce)
 }
 
 /*
- * Pass in the txg number that should be synced.
+ * If there isn't a txg syncing or in the pipeline, push another txg through
+ * the pipeline by quiescing the open txg.
  */
 void
-txg_kick(dsl_pool_t *dp, uint64_t txg)
+txg_kick(dsl_pool_t *dp)
 {
 	tx_state_t *tx = &dp->dp_tx;
 
 	ASSERT(!dsl_pool_config_held(dp));
 
-	if (tx->tx_sync_txg_waiting >= txg)
-		return;
-
 	mutex_enter(&tx->tx_sync_lock);
-	if (tx->tx_sync_txg_waiting < txg) {
-		tx->tx_sync_txg_waiting = txg;
-		cv_broadcast(&tx->tx_sync_more_cv);
+	if (!txg_is_syncing(dp) &&
+	    !txg_is_quiescing(dp) &&
+	    tx->tx_quiesce_txg_waiting <= tx->tx_open_txg &&
+	    tx->tx_sync_txg_waiting <= tx->tx_synced_txg &&
+	    tx->tx_quiesced_txg <= tx->tx_synced_txg) {
+		tx->tx_quiesce_txg_waiting = tx->tx_open_txg + 1;
+		cv_broadcast(&tx->tx_quiesce_more_cv);
 	}
 	mutex_exit(&tx->tx_sync_lock);
 }
@@ -904,10 +903,15 @@ txg_list_destroy(txg_list_t *tl)
 boolean_t
 txg_all_lists_empty(txg_list_t *tl)
 {
-	boolean_t res = B_TRUE;
-	for (int i = 0; i < TXG_SIZE; i++)
-		res &= (tl->tl_head[i] == NULL);
-	return (res);
+	mutex_enter(&tl->tl_lock);
+	for (int i = 0; i < TXG_SIZE; i++) {
+		if (!txg_list_empty_impl(tl, i)) {
+			mutex_exit(&tl->tl_lock);
+			return (B_FALSE);
+		}
+	}
+	mutex_exit(&tl->tl_lock);
+	return (B_TRUE);
 }
 
 /*
@@ -1073,5 +1077,7 @@ EXPORT_SYMBOL(txg_wait_callbacks);
 EXPORT_SYMBOL(txg_stalled);
 EXPORT_SYMBOL(txg_sync_waiting);
 
-ZFS_MODULE_PARAM(zfs_txg, zfs_txg_, timeout, UINT, ZMOD_RW,
+/* BEGIN CSTYLED */
+ZFS_MODULE_PARAM(zfs_txg, zfs_txg_, timeout, INT, ZMOD_RW,
 	"Max seconds worth of delta per txg");
+/* END CSTYLED */

@@ -16,19 +16,11 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_INODE_OWNER_OR_CAPABLE], [
 		(void) inode_owner_or_capable(ip);
 	])
 
-	ZFS_LINUX_TEST_SRC([inode_owner_or_capable_userns], [
+	ZFS_LINUX_TEST_SRC([inode_owner_or_capable_idmapped], [
 		#include <linux/fs.h>
 	],[
 		struct inode *ip = NULL;
 		(void) inode_owner_or_capable(&init_user_ns, ip);
-	])
-
-	ZFS_LINUX_TEST_SRC([inode_owner_or_capable_mnt_idmap], [
-		#include <linux/fs.h>
-		#include <linux/mnt_idmapping.h>
-	],[
-		struct inode *ip = NULL;
-		(void) inode_owner_or_capable(&nop_mnt_idmap, ip);
 	])
 ])
 
@@ -43,21 +35,12 @@ AC_DEFUN([ZFS_AC_KERNEL_INODE_OWNER_OR_CAPABLE], [
 
 		AC_MSG_CHECKING(
 		    [whether inode_owner_or_capable() takes user_ns])
-		ZFS_LINUX_TEST_RESULT([inode_owner_or_capable_userns], [
+		ZFS_LINUX_TEST_RESULT([inode_owner_or_capable_idmapped], [
 			AC_MSG_RESULT(yes)
-			AC_DEFINE(HAVE_INODE_OWNER_OR_CAPABLE_USERNS, 1,
+			AC_DEFINE(HAVE_INODE_OWNER_OR_CAPABLE_IDMAPPED, 1,
 			    [inode_owner_or_capable() takes user_ns])
 		],[
-			AC_MSG_RESULT(no)
-			AC_MSG_CHECKING(
-			    [whether inode_owner_or_capable() takes mnt_idmap])
-			ZFS_LINUX_TEST_RESULT([inode_owner_or_capable_mnt_idmap], [
-				AC_MSG_RESULT(yes)
-				AC_DEFINE(HAVE_INODE_OWNER_OR_CAPABLE_IDMAP, 1,
-				    [inode_owner_or_capable() takes mnt_idmap])
-			], [
-				ZFS_LINUX_TEST_ERROR([capability])
-			])
+			ZFS_LINUX_TEST_ERROR([capability])
 		])
 	])
 ])

@@ -6,7 +6,7 @@
 .\" You may not use this file except in compliance with the License.
 .\"
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-.\" or https://opensource.org/licenses/CDDL-1.0.
+.\" or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions
 .\" and limitations under the License.
 .\"
@@ -19,11 +19,10 @@
 .\" CDDL HEADER END
 .\"
 .\" Copyright 2013 Darik Horn <dajhorn@vanadac.com>. All rights reserved.
-.\" Copyright (c) 2024, Klara Inc.
 .\"
 .\" lint-ok: WARNING: sections out of conventional order: Sh SYNOPSIS
 .\"
-.Dd December 2, 2024
+.Dd May 26, 2021
 .Dt ZINJECT 8
 .Os
 .
@@ -70,21 +69,20 @@ Force a vdev into the DEGRADED or FAULTED state.
 .Nm zinject
 .Fl d Ar vdev
 .Fl D Ar latency : Ns Ar lanes
-.Op Fl T Ar read|write
 .Ar pool
 .Xc
-Add an artificial delay to I/O requests on a particular
+Add an artificial delay to IO requests on a particular
 device, such that the requests take a minimum of
 .Ar latency
 milliseconds to complete.
 Each delay has an associated number of
 .Ar lanes
 which defines the number of concurrent
-I/O requests that can be processed.
+IO requests that can be processed.
 .Pp
 For example, with a single lane delay of 10 ms
 .No (\& Ns Fl D Ar 10 : Ns Ar 1 ) ,
-the device will only be able to service a single I/O request
+the device will only be able to service a single IO request
 at a time with each request taking 10 ms to complete.
 So, if only a single request is submitted every 10 ms, the
 average latency will be 10 ms; but if more than one request
@@ -126,14 +124,6 @@ of 10 ms and two lanes with a 25 ms latency.
 .Ar pool
 .Xc
 Force a vdev error.
-.
-.It Xo
-.Nm zinject
-.Fl i Ar seconds
-.Ar pool
-.Xc
-Add an artificial delay during the future import of a pool.
-This injector is automatically cleared after the import is finished.
 .
 .It Xo
 .Nm zinject
@@ -198,7 +188,7 @@ Each number is in hexadecimal, and only one block can be specified.
 .It Fl C Ar dvas
 Inject the given error only into specific DVAs.
 The mask should be specified as a list of 0-indexed DVAs separated by commas
-.No (e.g . Ar 0,2 Ns No ).
+.No (ex. Ar 0,2 Ns No ).
 This option is not applicable to logical data errors such as
 .Sy decompress
 and
@@ -219,11 +209,9 @@ to flip a bit in the data after a read,
 .It Sy dtl
 for an ECHILD error,
 .It Sy io
-for an EIO error where reopening the device will succeed,
+for an EIO error where reopening the device will succeed, or
 .It Sy nxio
-for an ENXIO error where reopening the device will fail, or
-.It Sy noop
-to drop the IO without executing it, and return success.
+for an ENXIO error where reopening the device will fail.
 .El
 .Pp
 For EIO and ENXIO, the "failed" reads or writes still occur.
@@ -268,7 +256,6 @@ Run for this many seconds before reporting failure.
 .It Fl T Ar failure
 Set the failure type to one of
 .Sy all ,
-.Sy flush ,
 .Sy claim ,
 .Sy free ,
 .Sy read ,

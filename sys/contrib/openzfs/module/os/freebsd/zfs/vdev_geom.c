@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -63,9 +63,9 @@ struct consumer_vdev_elem {
 };
 
 SLIST_HEAD(consumer_priv_t, consumer_vdev_elem);
-_Static_assert(
-    sizeof (((struct g_consumer *)NULL)->private) ==
-    sizeof (struct consumer_priv_t *),
+/* BEGIN CSTYLED */
+_Static_assert(sizeof (((struct g_consumer *)NULL)->private)
+	== sizeof (struct consumer_priv_t*),
 	"consumer_priv_t* can't be stored in g_consumer.private");
 
 DECLARE_GEOM_CLASS(zfs_vdev_class, zfs_vdev);
@@ -74,11 +74,12 @@ SYSCTL_DECL(_vfs_zfs_vdev);
 /* Don't send BIO_FLUSH. */
 static int vdev_geom_bio_flush_disable;
 SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, bio_flush_disable, CTLFLAG_RWTUN,
-	&vdev_geom_bio_flush_disable, 0, "Disable BIO_FLUSH");
+    &vdev_geom_bio_flush_disable, 0, "Disable BIO_FLUSH");
 /* Don't send BIO_DELETE. */
 static int vdev_geom_bio_delete_disable;
 SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, bio_delete_disable, CTLFLAG_RWTUN,
-	&vdev_geom_bio_delete_disable, 0, "Disable BIO_DELETE");
+    &vdev_geom_bio_delete_disable, 0, "Disable BIO_DELETE");
+/* END CSTYLED */
 
 /* Declare local functions */
 static void vdev_geom_detach(struct g_consumer *cp, boolean_t open_for_read);
@@ -198,6 +199,7 @@ vdev_geom_orphan(struct g_consumer *cp)
 	 * async removal support to invoke a close on this
 	 * vdev once it is safe to do so.
 	 */
+	// cppcheck-suppress All
 	SLIST_FOREACH(elem, priv, elems) {
 		// cppcheck-suppress uninitvar
 		vdev_t *vd = elem->vd;
@@ -379,7 +381,11 @@ vdev_geom_io(struct g_consumer *cp, int *cmds, void **datas, off_t *offsets,
 	int i, n_bios, j;
 	size_t bios_size;
 
+#if __FreeBSD_version > 1300130
 	maxio = maxphys - (maxphys % cp->provider->sectorsize);
+#else
+	maxio = MAXPHYS - (MAXPHYS % cp->provider->sectorsize);
+#endif
 	n_bios = 0;
 
 	/* How many bios are required for all commands ? */
@@ -396,8 +402,8 @@ vdev_geom_io(struct g_consumer *cp, int *cmds, void **datas, off_t *offsets,
 		p = datas[i];
 		s = sizes[i];
 		end = off + s;
-		ASSERT0(off % cp->provider->sectorsize);
-		ASSERT0(s % cp->provider->sectorsize);
+		ASSERT((off % cp->provider->sectorsize) == 0);
+		ASSERT((s % cp->provider->sectorsize) == 0);
 
 		for (; off < end; off += maxio, p += maxio, s -= maxio, j++) {
 			bios[j] = g_alloc_bio();
@@ -409,7 +415,7 @@ vdev_geom_io(struct g_consumer *cp, int *cmds, void **datas, off_t *offsets,
 			g_io_request(bios[j], cp);
 		}
 	}
-	ASSERT3S(j, ==, n_bios);
+	ASSERT(j == n_bios);
 
 	/* Wait for all of the bios to complete, and clean them up */
 	for (i = j = 0; i < ncmds; i++) {
@@ -453,7 +459,7 @@ vdev_geom_read_config(struct g_consumer *cp, nvlist_t **configp)
 	ZFS_LOG(1, "Reading config from %s...", pp->name);
 
 	psize = pp->mediasize;
-	psize = P2ALIGN_TYPED(psize, sizeof (vdev_label_t), uint64_t);
+	psize = P2ALIGN(psize, (uint64_t)sizeof (vdev_label_t));
 
 	size = sizeof (*vdev_lists[0]) + pp->sectorsize -
 	    ((sizeof (*vdev_lists[0]) - 1) % pp->sectorsize) - 1;
@@ -467,7 +473,7 @@ vdev_geom_read_config(struct g_consumer *cp, nvlist_t **configp)
 		offsets[l] = vdev_label_offset(psize, l, 0) + VDEV_SKIP_SIZE;
 		sizes[l] = size;
 		errors[l] = 0;
-		ASSERT0(offsets[l] % pp->sectorsize);
+		ASSERT(offsets[l] % pp->sectorsize == 0);
 	}
 
 	/* Issue the IO requests */
@@ -539,7 +545,7 @@ process_vdev_config(nvlist_t ***configs, uint64_t *count, nvlist_t *cfg,
 	uint64_t pool_guid;
 	uint64_t vdev_guid;
 	uint64_t id, txg, known_txg;
-	const char *pname;
+	char *pname;
 
 	if (nvlist_lookup_string(cfg, ZPOOL_CONFIG_POOL_NAME, &pname) != 0 ||
 	    strcmp(pname, name) != 0)
@@ -557,7 +563,7 @@ process_vdev_config(nvlist_t ***configs, uint64_t *count, nvlist_t *cfg,
 	if (nvlist_lookup_uint64(vdev_tree, ZPOOL_CONFIG_ID, &id) != 0)
 		goto ignore;
 
-	txg = fnvlist_lookup_uint64(cfg, ZPOOL_CONFIG_POOL_TXG);
+	VERIFY(nvlist_lookup_uint64(cfg, ZPOOL_CONFIG_POOL_TXG, &txg) == 0);
 
 	if (*known_pool_guid != 0) {
 		if (pool_guid != *known_pool_guid)
@@ -568,8 +574,8 @@ process_vdev_config(nvlist_t ***configs, uint64_t *count, nvlist_t *cfg,
 	resize_configs(configs, count, id);
 
 	if ((*configs)[id] != NULL) {
-		known_txg = fnvlist_lookup_uint64((*configs)[id],
-		    ZPOOL_CONFIG_POOL_TXG);
+		VERIFY(nvlist_lookup_uint64((*configs)[id],
+		    ZPOOL_CONFIG_POOL_TXG, &known_txg) == 0);
 		if (txg <= known_txg)
 			goto ignore;
 		nvlist_free((*configs)[id]);
@@ -813,7 +819,7 @@ vdev_geom_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	 * Set the TLS to indicate downstack that we
 	 * should not access zvols
 	 */
-	VERIFY0(tsd_set(zfs_geom_probe_vdev_key, vd));
+	VERIFY(tsd_set(zfs_geom_probe_vdev_key, vd) == 0);
 
 	/*
 	 * We must have a pathname, and it must be absolute.
@@ -873,7 +879,7 @@ vdev_geom_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	}
 
 	/* Clear the TLS now that tasting is done */
-	VERIFY0(tsd_set(zfs_geom_probe_vdev_key, NULL));
+	VERIFY(tsd_set(zfs_geom_probe_vdev_key, NULL) == 0);
 
 	if (cp == NULL) {
 		ZFS_LOG(1, "Vdev %s not found.", vd->vdev_path);
@@ -951,7 +957,8 @@ skip_open:
 	*logical_ashift = highbit(MAX(pp->sectorsize, SPA_MINBLOCKSIZE)) - 1;
 	*physical_ashift = 0;
 	if (pp->stripesize && pp->stripesize > (1 << *logical_ashift) &&
-	    ISP2(pp->stripesize) && pp->stripeoffset == 0)
+	    ISP2(pp->stripesize) && pp->stripesize <= (1 << ASHIFT_MAX) &&
+	    pp->stripeoffset == 0)
 		*physical_ashift = highbit(pp->stripesize) - 1;
 
 	/*
@@ -1049,7 +1056,7 @@ vdev_geom_io_intr(struct bio *bp)
 	/*
 	 * We have to split bio freeing into two parts, because the ABD code
 	 * cannot be called in this context and vdev_op_io_done is not called
-	 * for ZIO_TYPE_FLUSH zio-s.
+	 * for ZIO_TYPE_IOCTL zio-s.
 	 */
 	if (zio->io_type != ZIO_TYPE_READ && zio->io_type != ZIO_TYPE_WRITE) {
 		g_destroy_bio(bp);
@@ -1126,12 +1133,8 @@ vdev_geom_fill_unmap_cb(void *buf, size_t len, void *priv)
 	vm_offset_t addr = (vm_offset_t)buf;
 	vm_offset_t end = addr + len;
 
-	if (bp->bio_ma_n == 0) {
+	if (bp->bio_ma_n == 0)
 		bp->bio_ma_offset = addr & PAGE_MASK;
-		addr &= ~PAGE_MASK;
-	} else {
-		ASSERT0(P2PHASE(addr, PAGE_SIZE));
-	}
 	do {
 		bp->bio_ma[bp->bio_ma_n++] =
 		    PHYS_TO_VM_PAGE(pmap_kextract(addr));
@@ -1149,35 +1152,46 @@ vdev_geom_io_start(zio_t *zio)
 
 	vd = zio->io_vd;
 
-	if (zio->io_type == ZIO_TYPE_FLUSH) {
+	switch (zio->io_type) {
+	case ZIO_TYPE_IOCTL:
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = SET_ERROR(ENXIO);
 			zio_interrupt(zio);
 			return;
+		} else {
+			switch (zio->io_cmd) {
+			case DKIOCFLUSHWRITECACHE:
+				if (zfs_nocacheflush ||
+				    vdev_geom_bio_flush_disable)
+					break;
+				if (vd->vdev_nowritecache) {
+					zio->io_error = SET_ERROR(ENOTSUP);
+					break;
+				}
+				goto sendreq;
+			default:
+				zio->io_error = SET_ERROR(ENOTSUP);
+			}
 		}
 
-		if (zfs_nocacheflush || vdev_geom_bio_flush_disable) {
-			zio_execute(zio);
-			return;
+		zio_execute(zio);
+		return;
+	case ZIO_TYPE_TRIM:
+		if (!vdev_geom_bio_delete_disable) {
+			goto sendreq;
 		}
-
-		if (vd->vdev_nowritecache) {
-			zio->io_error = SET_ERROR(ENOTSUP);
-			zio_execute(zio);
-			return;
-		}
-	} else if (zio->io_type == ZIO_TYPE_TRIM) {
-		if (vdev_geom_bio_delete_disable) {
-			zio_execute(zio);
-			return;
-		}
+		zio_execute(zio);
+		return;
+	default:
+			;
+		/* PASSTHROUGH --- placate compiler */
 	}
-
+sendreq:
 	ASSERT(zio->io_type == ZIO_TYPE_READ ||
 	    zio->io_type == ZIO_TYPE_WRITE ||
 	    zio->io_type == ZIO_TYPE_TRIM ||
-	    zio->io_type == ZIO_TYPE_FLUSH);
+	    zio->io_type == ZIO_TYPE_IOCTL);
 
 	cp = vd->vdev_tsd;
 	if (cp == NULL) {
@@ -1229,7 +1243,7 @@ vdev_geom_io_start(zio_t *zio)
 		bp->bio_offset = zio->io_offset;
 		bp->bio_length = zio->io_size;
 		break;
-	case ZIO_TYPE_FLUSH:
+	case ZIO_TYPE_IOCTL:
 		bp->bio_cmd = BIO_FLUSH;
 		bp->bio_data = NULL;
 		bp->bio_offset = cp->provider->mediasize;
@@ -1250,7 +1264,7 @@ vdev_geom_io_done(zio_t *zio)
 	struct bio *bp = zio->io_bio;
 
 	if (zio->io_type != ZIO_TYPE_READ && zio->io_type != ZIO_TYPE_WRITE) {
-		ASSERT3P(bp, ==, NULL);
+		ASSERT(bp == NULL);
 		return;
 	}
 

@@ -1,11 +1,14 @@
-libefi_la_CFLAGS  = $(AM_CFLAGS) $(LIBRARY_CFLAGS)
-libefi_la_CFLAGS += $(LIBUUID_CFLAGS) $(ZLIB_CFLAGS)
-libefi_la_CFLAGS += -fvisibility=hidden
+include $(top_srcdir)/config/Rules.am
 
-noinst_LTLIBRARIES += libefi.la
-CPPCHECKTARGETS    += libefi.la
+AM_CFLAGS += $(LIBUUID_CFLAGS) $(ZLIB_CFLAGS)
 
-libefi_la_SOURCES = \
-	%D%/rdwr_efi.c
+noinst_LTLIBRARIES = libefi.la
+
+USER_C = \
+	rdwr_efi.c
+
+libefi_la_SOURCES = $(USER_C)
 
 libefi_la_LIBADD = $(LIBUUID_LIBS) $(ZLIB_LIBS)
+
+include $(top_srcdir)/config/CppCheck.am

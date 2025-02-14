@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -45,7 +45,9 @@
 
 function cleanup
 {
-	datasetexists $snap_fs && destroy_dataset $snap_fs
+	if datasetexists $snap_fs; then
+		log_must zfs destroy $snap_fs
+	fi
 
 	log_must cleanup_quota
 }
@@ -65,7 +67,7 @@ log_must zfs set groupquota@$QGROUP=500m $QFS
 mkmount_writable $QFS
 log_must user_run $QUSER1 mkfile 50m $QFILE
 
-sync_all_pools
+sync
 
 log_must zfs snapshot $snap_fs
 

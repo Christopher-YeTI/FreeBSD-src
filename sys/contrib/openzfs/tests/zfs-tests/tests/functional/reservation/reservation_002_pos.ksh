@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -54,7 +54,7 @@ verify_runnable "both"
 function cleanup
 {
 	for obj in $OBJ_LIST; do
-		datasetexists $obj && destroy_dataset $obj -f
+		datasetexists $obj && log_must_busy zfs destroy -f $obj
 	done
 
 	log_must zero_reservation $TESTPOOL/$TESTFS

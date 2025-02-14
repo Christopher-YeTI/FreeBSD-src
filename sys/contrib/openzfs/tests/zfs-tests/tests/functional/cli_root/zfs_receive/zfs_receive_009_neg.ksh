@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,10 +48,13 @@ function cleanup
 {
 	typeset ds
 
-	snapexists $snap && destroy_dataset $snap
-
+	if snapexists $snap; then
+		log_must zfs destroy $snap
+	fi
 	for ds in $ctr1 $ctr2 $fs1; do
-		datasetexists $ds && destroy_dataset $ds -rf
+		if datasetexists $ds; then
+			log_must zfs destroy -rf $ds
+		fi
 	done
 	if [[ -d $TESTDIR2 ]]; then
 		rm -rf $TESTDIR2
@@ -92,10 +95,11 @@ typeset -i i=0
 while (( i < ${#validopts[*]} )); do
 	log_mustnot eval "zfs recv < $bkup"
 
-	if echo ${validopts[i]} | grep -q "d"; then
-		log_mustnot eval "zfs recv ${validopts[i]} $ctr1 $ctr2 < $bkup"
-	else
+	echo ${validopts[i]} | grep "d" >/dev/null 2>&1
+	if (( $? != 0 )); then
 		log_mustnot eval "zfs recv ${validopts[i]} $fs2 $fs3 < $bkup"
+	else
+		log_mustnot eval "zfs recv ${validopts[i]} $ctr1 $ctr2 < $bkup"
 	fi
 
 	(( i += 1 ))

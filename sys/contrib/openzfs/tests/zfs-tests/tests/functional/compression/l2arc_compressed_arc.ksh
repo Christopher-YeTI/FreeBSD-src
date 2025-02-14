@@ -36,7 +36,7 @@ export PERF_COMPPERCENT=66
 export PERF_COMPCHUNK=0
 export BLOCKSIZE=128K
 export SYNC_TYPE=0
-export DIRECT=0
+export DIRECT=1
 
 #
 # DESCRIPTION:
@@ -51,8 +51,6 @@ export DIRECT=0
 #
 
 verify_runnable "global"
-
-command -v fio > /dev/null || log_unsupported "fio missing"
 
 log_assert "L2ARC with compressed_arc enabled succeeds."
 

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,19 +48,23 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists $SNAPFS && log_must zfs destroy $SNAPFS
+	snapexists $SNAPFS
+	[[ $? -eq 0 ]] && \
+		log_must zfs destroy $SNAPFS
 
-	[ -e $TESTDIR ] && log_must rm -rf $TESTDIR/*
+	[[ -e $TESTDIR ]] && \
+		log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 }
 
 log_assert "Verify that a snapshot of an empty file system remains empty."
 
 log_onexit cleanup
 
-[ -n $TESTDIR ] && log_must rm -rf $TESTDIR/*
+[[ -n $TESTDIR ]] && \
+    log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 
 log_must zfs snapshot $SNAPFS
-FILE_COUNT=$(ls -A $SNAPDIR | wc -l)
+FILE_COUNT=`ls -Al $SNAPDIR | grep -v "total 0" | wc -l`
 if [[ $FILE_COUNT -ne 0 ]]; then
 	ls $SNAPDIR
 	log_fail "BEFORE: $SNAPDIR contains $FILE_COUNT files(s)."
@@ -77,7 +81,7 @@ while [[ $i -lt $COUNT ]]; do
 	(( i = i + 1 ))
 done
 
-FILE_COUNT=$(ls -A $SNAPDIR | wc -l)
+FILE_COUNT=`ls -Al $SNAPDIR | grep -v "total 0" | wc -l`
 if [[ $FILE_COUNT -ne 0 ]]; then
         ls $SNAPDIR
         log_fail "AFTER: $SNAPDIR contains $FILE_COUNT files(s)."

@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at * usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -52,7 +52,7 @@ nv_free_spl(nv_alloc_t *nva, void *buf, size_t size)
 	kmem_free(buf, size);
 }
 
-static const nv_alloc_ops_t spl_sleep_ops_def = {
+const nv_alloc_ops_t spl_sleep_ops_def = {
 	.nv_ao_init = NULL,
 	.nv_ao_fini = NULL,
 	.nv_ao_alloc = nv_alloc_sleep_spl,
@@ -60,7 +60,7 @@ static const nv_alloc_ops_t spl_sleep_ops_def = {
 	.nv_ao_reset = NULL
 };
 
-static const nv_alloc_ops_t spl_pushpage_ops_def = {
+const nv_alloc_ops_t spl_pushpage_ops_def = {
 	.nv_ao_init = NULL,
 	.nv_ao_fini = NULL,
 	.nv_ao_alloc = nv_alloc_pushpage_spl,
@@ -68,7 +68,7 @@ static const nv_alloc_ops_t spl_pushpage_ops_def = {
 	.nv_ao_reset = NULL
 };
 
-static const nv_alloc_ops_t spl_nosleep_ops_def = {
+const nv_alloc_ops_t spl_nosleep_ops_def = {
 	.nv_ao_init = NULL,
 	.nv_ao_fini = NULL,
 	.nv_ao_alloc = nv_alloc_nosleep_spl,
@@ -76,21 +76,21 @@ static const nv_alloc_ops_t spl_nosleep_ops_def = {
 	.nv_ao_reset = NULL
 };
 
-static nv_alloc_t nv_alloc_sleep_def = {
+nv_alloc_t nv_alloc_sleep_def = {
 	&spl_sleep_ops_def,
 	NULL
 };
 
-static nv_alloc_t nv_alloc_pushpage_def = {
+nv_alloc_t nv_alloc_pushpage_def = {
 	&spl_pushpage_ops_def,
 	NULL
 };
 
-static nv_alloc_t nv_alloc_nosleep_def = {
+nv_alloc_t nv_alloc_nosleep_def = {
 	&spl_nosleep_ops_def,
 	NULL
 };
 
-nv_alloc_t *const nv_alloc_sleep = &nv_alloc_sleep_def;
-nv_alloc_t *const nv_alloc_pushpage = &nv_alloc_pushpage_def;
-nv_alloc_t *const nv_alloc_nosleep = &nv_alloc_nosleep_def;
+nv_alloc_t *nv_alloc_sleep = &nv_alloc_sleep_def;
+nv_alloc_t *nv_alloc_pushpage = &nv_alloc_pushpage_def;
+nv_alloc_t *nv_alloc_nosleep = &nv_alloc_nosleep_def;

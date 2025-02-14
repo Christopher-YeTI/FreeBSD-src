@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -66,20 +66,29 @@ log_must zpool get all $TESTPOOL
 zpool get all $TESTPOOL > $values
 
 log_note "Checking zpool get all output for a header."
-log_must grep -q ^"NAME " $values
+grep ^"NAME " $values > /dev/null 2>&1
+if [ $? -ne 0 ]
+then
+	log_fail "The header was not printed from zpool get all"
+fi
 
 
 while [ $i -lt "${#properties[@]}" ]
 do
 	log_note "Checking for ${properties[$i]} property"
-	log_must grep -q "$TESTPOOL *${properties[$i]}" $values
+	grep "$TESTPOOL *${properties[$i]}" $values > /dev/null 2>&1
+	if [ $? -ne 0 ]
+	then
+		log_fail "zpool property ${properties[$i]} was not found\
+ in pool output."
+	fi
 	i=$(( $i + 1 ))
 done
 
 # increment the counter to include the header line
 i=$(( $i + 1 ))
 
-COUNT=$(wc -l < $values)
+COUNT=$(wc $values | awk '{print $1}')
 if [ $i -ne $COUNT ]
 then
 	log_fail "Found zpool features not in the zpool_get test config $i/$COUNT."

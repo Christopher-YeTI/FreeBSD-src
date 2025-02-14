@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -47,7 +47,9 @@
 function cleanup
 {
 	for dset in $rst_snap $rst_fs $orig_snap; do
-		datasetexists $dset && destroy_dataset $dset -fr
+		if datasetexists $dset; then
+			log_must zfs destroy -fr $dset
+		fi
 	done
 
 	for file in $fbackup $mnt_file $tmp_out; do
@@ -57,7 +59,7 @@ function cleanup
 	done
 
 	if datasetexists $TESTPOOL/$TESTFS; then
-		destroy_dataset $TESTPOOL/$TESTFS -Rf
+		log_must zfs destroy -Rf $TESTPOOL/$TESTFS
 		log_must zfs create $TESTPOOL/$TESTFS
 		log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 	fi
@@ -86,6 +88,9 @@ for orig_fs in $datasets ; do
 
 	typeset mntpnt
 	mntpnt=$(get_prop mountpoint $orig_fs)
+	if [[ $? -ne 0 ]] ; then
+		log_fail "get_prop mountpoint $orig_fs failed"
+	fi
 
 	typeset mnt_file=$mntpnt/file1
 
@@ -94,7 +99,9 @@ for orig_fs in $datasets ; do
 	log_must eval "zfs send $orig_snap > $fbackup"
 
 	for opt in "-v"  "-vn"; do
-		datasetexists $rst_fs && destroy_dataset $rst_fs -fr
+		if datasetexists $rst_fs; then
+			log_must zfs destroy -fr $rst_fs
+		fi
 		log_note "Check ZFS receive $opt [<filesystem|snapshot>]"
 		log_must eval "zfs receive $opt $rst_fs < $fbackup > $tmp_out 2>&1"
 		if [[ $opt == "-v" ]]; then

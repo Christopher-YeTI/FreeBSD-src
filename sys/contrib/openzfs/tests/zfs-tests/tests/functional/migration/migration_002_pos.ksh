@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -34,12 +34,12 @@
 
 #
 # DESCRIPTION:
-# Migrating test file from ZFS fs to platform native fs using tar.
+# Migrating test file from ZFS fs to UFS fs using tar.
 #
 # STRATEGY:
 # 1. Calculate chksum of testfile
 # 2. Tar up test file and place on a ZFS filesystem
-# 3. Extract tar contents to a platform native file system
+# 3. Extract tar contents to a UFS file system
 # 4. Calculate chksum of extracted file
 # 5. Compare old and new chksums.
 #
@@ -48,14 +48,19 @@ verify_runnable "both"
 
 function cleanup
 {
-	rm -rf $TESTDIR/tar$$.tar $NONZFS_TESTDIR/$BNAME
+	rm -rf $TESTDIR/tar$$.tar
+	rm -rf $NONZFS_TESTDIR/$BNAME
 }
 
-log_assert "Migrating test file from ZFS fs to $NEWFS_DEFAULT_FS fs using tar"
+log_assert "Migrating test file from ZFS fs to UFS fs using tar"
 
 log_onexit cleanup
 
-log_must prepare $DNAME "tar cf $TESTDIR/tar$$.tar $BNAME"
-log_must migrate $NONZFS_TESTDIR $SUMA $SUMB "tar xf $TESTDIR/tar$$.tar"
+prepare $DNAME "tar cf $TESTDIR/tar$$.tar $BNAME"
+(( $? != 0 )) && log_fail "Unable to create src archive"
 
-log_pass "Successfully migrated test file from ZFS fs to $NEWFS_DEFAULT_FS fs".
+migrate $NONZFS_TESTDIR $SUMA $SUMB "tar xf $TESTDIR/tar$$.tar"
+(( $? != 0 )) && log_fail "Unable to successfully migrate test file from" \
+    "ZFS fs to UFS fs"
+
+log_pass "Successfully migrated test file from ZFS fs to UFS fs".

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -55,9 +55,10 @@ log_onexit cleanup
 NR_FILES=60000
 BATCH=1000
 
-log_must mkdir $TESTDIR/src $TESTDIR/dst
+log_must mkdir $TESTDIR/src
+log_must mkdir $TESTDIR/dst
 
-WD=$PWD
+WD=$(pwd)
 cd $TESTDIR/src
 # create NR_FILES in BATCH at a time to prevent overflowing argument buffer
 for i in $(seq $(($NR_FILES/$BATCH))); do touch $(seq $((($i-1)*$BATCH+1)) $(($i*$BATCH))); done
@@ -66,7 +67,7 @@ cd $WD
 log_must test $NR_FILES -eq $(ls -U $TESTDIR/src | wc -l)
 
 # copy files from src to dst, use cp_files to make sure we copy in readdir order
-log_must cp_files $TESTDIR/src $TESTDIR/dst
+log_must $STF_SUITE/tests/functional/cp_files/cp_files $TESTDIR/src $TESTDIR/dst
 
 log_must test $NR_FILES -eq $(ls -U $TESTDIR/dst | wc -l)
 

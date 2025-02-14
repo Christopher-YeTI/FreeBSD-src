@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -56,7 +56,8 @@ function testdbufstat # stat_name dbufstat_filter
         [[ -n "$2" ]] && filter="-F $2"
 
 	if is_linux; then
-		read -r _ _ from_dbufstat _ < <(grep -w "$name" "$DBUFSTATS_FILE")
+		from_dbufstat=$(grep -w "$name" "$DBUFSTATS_FILE" |
+		    awk '{ print $3 }')
 	else
 		from_dbufstat=$(awk "/dbufstats\.$name:/ { print \$2 }" \
 		    "$DBUFSTATS_FILE")
@@ -74,7 +75,7 @@ log_assert "dbufstats produces correct statistics"
 log_onexit cleanup
 
 log_must file_write -o create -f "$TESTDIR/file" -b 1048576 -c 20 -d R
-sync_all_pools
+log_must zpool sync
 
 log_must eval "kstat dbufs > $DBUFS_FILE"
 log_must eval "kstat dbufstats '' > $DBUFSTATS_FILE"

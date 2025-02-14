@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -68,10 +68,12 @@ DECLARE_EVENT_CLASS(zfs_removing_class_3,
 );
 /* END CSTYLED */
 
-#define	DEFINE_REMOVE_FREE_EVENT(name) \
+/* BEGIN CSTYLED */
+#define DEFINE_REMOVE_FREE_EVENT(name) \
 DEFINE_EVENT(zfs_removing_class_3, name, \
-    TP_PROTO(spa_t *spa, uint64_t offset, uint64_t size), \
-    TP_ARGS(spa, offset, size))
+	TP_PROTO(spa_t *spa, uint64_t offset, uint64_t size), \
+	TP_ARGS(spa, offset, size))
+/* END CSTYLED */
 DEFINE_REMOVE_FREE_EVENT(zfs_remove__free__synced);
 DEFINE_REMOVE_FREE_EVENT(zfs_remove__free__unvisited);
 
@@ -105,10 +107,12 @@ DECLARE_EVENT_CLASS(zfs_removing_class_4,
 	    __entry->vdev_size, __entry->vdev_txg)
 );
 
+/* BEGIN CSTYLED */
 #define DEFINE_REMOVE_FREE_EVENT_TXG(name) \
 DEFINE_EVENT(zfs_removing_class_4, name, \
-    TP_PROTO(spa_t *spa, uint64_t offset, uint64_t size,uint64_t txg), \
-    TP_ARGS(spa, offset, size, txg))
+	TP_PROTO(spa_t *spa, uint64_t offset, uint64_t size,uint64_t txg), \
+	TP_ARGS(spa, offset, size, txg))
+/* END CSTYLED */
 DEFINE_REMOVE_FREE_EVENT_TXG(zfs_remove__free__inflight);
 
 #endif /* _TRACE_VDEV_H */

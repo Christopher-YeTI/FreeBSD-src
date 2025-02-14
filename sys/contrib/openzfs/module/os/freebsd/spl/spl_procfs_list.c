@@ -25,6 +25,9 @@
  *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <sys/list.h>
 #include <sys/mutex.h>
 #include <sys/procfs_list.h>

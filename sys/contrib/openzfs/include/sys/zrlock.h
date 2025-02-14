@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -34,8 +34,9 @@ extern "C" {
 
 typedef struct zrlock {
 	kmutex_t zr_mtx;
-	kcondvar_t zr_cv;
 	volatile int32_t zr_refcount;
+	kcondvar_t zr_cv;
+	uint16_t zr_pad;
 #ifdef	ZFS_DEBUG
 	kthread_t *zr_owner;
 	const char *zr_caller;

@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -39,6 +39,7 @@ struct list_node {
 };
 
 struct list {
+	size_t	list_size;
 	size_t	list_offset;
 	struct list_node list_head;
 };

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -22,13 +22,13 @@
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
-#define TEXT_DOMAIN "libnvpair"
 
 #include <unistd.h>
 #include <string.h>
 #include <libintl.h>
 #include <sys/types.h>
 #include <sys/inttypes.h>
+#include <sys/note.h>
 #include <stdarg.h>
 #include "libnvpair.h"
 
@@ -71,7 +71,7 @@ struct nvlist_printops {
 	DEFINEOP(print_int64, int64_t);
 	DEFINEOP(print_uint64, uint64_t);
 	DEFINEOP(print_double, double);
-	DEFINEOP(print_string, const char *);
+	DEFINEOP(print_string, char *);
 	DEFINEOP(print_hrtime, hrtime_t);
 	DEFINEOP(print_nvlist, nvlist_t *);
 	DEFINEARROP(print_boolean_array, boolean_t *);
@@ -84,7 +84,7 @@ struct nvlist_printops {
 	DEFINEARROP(print_uint32_array, uint32_t *);
 	DEFINEARROP(print_int64_array, int64_t *);
 	DEFINEARROP(print_uint64_array, uint64_t *);
-	DEFINEARROP(print_string_array, const char **);
+	DEFINEARROP(print_string_array, char **);
 	DEFINEARROP(print_nvlist_array, nvlist_t **);
 };
 
@@ -191,26 +191,15 @@ static int \
 nvprint_##type_and_variant(nvlist_prtctl_t pctl, void *private, \
     nvlist_t *nvl, const char *name, vtype value) \
 { \
-	(void) private; \
-	(void) nvl; \
 	FILE *fp = pctl->nvprt_fp; \
+	NOTE(ARGUNUSED(private)) \
+	NOTE(ARGUNUSED(nvl)) \
 	indent(pctl, 1); \
 	(void) fprintf(fp, pctl->nvprt_nmfmt, name); \
 	(void) fprintf(fp, vfmt, (ptype)value); \
 	return (1); \
 }
 
-/*
- * Workaround for GCC 12+ with UBSan enabled deficencies.
- *
- * GCC 12+ invoked with -fsanitize=undefined incorrectly reports the code
- * below as violating -Wformat-overflow.
- */
-#if defined(__GNUC__) && !defined(__clang__) && \
-	defined(ZFS_UBSAN_ENABLED) && defined(HAVE_FORMAT_OVERFLOW)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-overflow"
-#endif
 NVLIST_PRTFUNC(boolean, int, int, "%d")
 NVLIST_PRTFUNC(boolean_value, boolean_t, int, "%d")
 NVLIST_PRTFUNC(byte, uchar_t, uchar_t, "0x%2.2x")
@@ -223,12 +212,8 @@ NVLIST_PRTFUNC(uint32, uint32_t, uint32_t, "0x%x")
 NVLIST_PRTFUNC(int64, int64_t, longlong_t, "%lld")
 NVLIST_PRTFUNC(uint64, uint64_t, u_longlong_t, "0x%llx")
 NVLIST_PRTFUNC(double, double, double, "0x%f")
-NVLIST_PRTFUNC(string, const char *, const char *, "%s")
+NVLIST_PRTFUNC(string, char *, char *, "%s")
 NVLIST_PRTFUNC(hrtime, hrtime_t, hrtime_t, "0x%llx")
-#if defined(__GNUC__) && !defined(__clang__) && \
-	defined(ZFS_UBSAN_ENABLED) && defined(HAVE_FORMAT_OVERFLOW)
-#pragma GCC diagnostic pop
-#endif
 
 /*
  * Generate functions to print array-valued nvlist members.
@@ -239,10 +224,10 @@ static int \
 nvaprint_##type_and_variant(nvlist_prtctl_t pctl, void *private, \
     nvlist_t *nvl, const char *name, vtype *valuep, uint_t count) \
 { \
-	(void) private; \
-	(void) nvl; \
 	FILE *fp = pctl->nvprt_fp; \
 	uint_t i; \
+	NOTE(ARGUNUSED(private)) \
+	NOTE(ARGUNUSED(nvl)) \
 	for (i = 0; i < count; i++) { \
 		if (i == 0 || pctl->nvprt_btwnarrfmt_nl) { \
 			indent(pctl, 1); \
@@ -267,13 +252,13 @@ NVLIST_ARRPRTFUNC(int32_array, int32_t, int32_t, "%d")
 NVLIST_ARRPRTFUNC(uint32_array, uint32_t, uint32_t, "0x%x")
 NVLIST_ARRPRTFUNC(int64_array, int64_t, longlong_t, "%lld")
 NVLIST_ARRPRTFUNC(uint64_array, uint64_t, u_longlong_t, "0x%llx")
-NVLIST_ARRPRTFUNC(string_array, const char *, const char *, "%s")
+NVLIST_ARRPRTFUNC(string_array, char *, char *, "%s")
 
+/*ARGSUSED*/
 static int
 nvprint_nvlist(nvlist_prtctl_t pctl, void *private,
     nvlist_t *nvl, const char *name, nvlist_t *value)
 {
-	(void) private, (void) nvl;
 	FILE *fp = pctl->nvprt_fp;
 
 	indent(pctl, 1);
@@ -289,11 +274,11 @@ nvprint_nvlist(nvlist_prtctl_t pctl, void *private,
 	return (1);
 }
 
+/*ARGSUSED*/
 static int
 nvaprint_nvlist_array(nvlist_prtctl_t pctl, void *private,
     nvlist_t *nvl, const char *name, nvlist_t **valuep, uint_t count)
 {
-	(void) private, (void) nvl;
 	FILE *fp = pctl->nvprt_fp;
 	uint_t i;
 
@@ -384,7 +369,7 @@ nvlist_prtctl_setfmt(nvlist_prtctl_t pctl, enum nvlist_prtctl_fmt which,
 			pctl->nvprt_btwnarrfmt_nl = 0;
 		} else {
 			pctl->nvprt_btwnarrfmt = fmt;
-			pctl->nvprt_btwnarrfmt_nl = (strchr(fmt, '\n') != NULL);
+			pctl->nvprt_btwnarrfmt_nl = (strstr(fmt, "\n") != NULL);
 		}
 		break;
 
@@ -399,13 +384,13 @@ nvlist_prtctl_dofmt(nvlist_prtctl_t pctl, enum nvlist_prtctl_fmt which, ...)
 {
 	FILE *fp = pctl->nvprt_fp;
 	va_list ap;
-	const char *name;
+	char *name;
 
 	va_start(ap, which);
 
 	switch (which) {
 	case NVLIST_FMT_MEMBER_NAME:
-		name = va_arg(ap, const char *);
+		name = va_arg(ap, char *);
 		(void) fprintf(fp, pctl->nvprt_nmfmt, name);
 		break;
 
@@ -454,7 +439,7 @@ NVLIST_PRINTCTL_REPLACE(uint32, uint32_t)
 NVLIST_PRINTCTL_REPLACE(int64, int64_t)
 NVLIST_PRINTCTL_REPLACE(uint64, uint64_t)
 NVLIST_PRINTCTL_REPLACE(double, double)
-NVLIST_PRINTCTL_REPLACE(string, const char *)
+NVLIST_PRINTCTL_REPLACE(string, char *)
 NVLIST_PRINTCTL_REPLACE(hrtime, hrtime_t)
 NVLIST_PRINTCTL_REPLACE(nvlist, nvlist_t *)
 
@@ -478,7 +463,7 @@ NVLIST_PRINTCTL_AREPLACE(int32_array, int32_t *)
 NVLIST_PRINTCTL_AREPLACE(uint32_array, uint32_t *)
 NVLIST_PRINTCTL_AREPLACE(int64_array, int64_t *)
 NVLIST_PRINTCTL_AREPLACE(uint64_array, uint64_t *)
-NVLIST_PRINTCTL_AREPLACE(string_array, const char **)
+NVLIST_PRINTCTL_AREPLACE(string_array, char **)
 NVLIST_PRINTCTL_AREPLACE(nvlist_array, nvlist_t **)
 
 /*
@@ -581,7 +566,7 @@ static void
 nvlist_print_with_indent(nvlist_t *nvl, nvlist_prtctl_t pctl)
 {
 	FILE *fp = pctl->nvprt_fp;
-	const char *name;
+	char *name;
 	uint_t nelem;
 	nvpair_t *nvp;
 
@@ -671,7 +656,7 @@ nvlist_print_with_indent(nvlist_t *nvl, nvlist_prtctl_t pctl)
 			break;
 		}
 		case DATA_TYPE_STRING: {
-			const char *val;
+			char *val;
 			(void) nvpair_value_string(nvp, &val);
 			RENDER(pctl, string, nvl, name, val);
 			break;
@@ -737,7 +722,7 @@ nvlist_print_with_indent(nvlist_t *nvl, nvlist_prtctl_t pctl)
 			break;
 		}
 		case DATA_TYPE_STRING_ARRAY: {
-			const char **val;
+			char **val;
 			(void) nvpair_value_string_array(nvp, &val, &nelem);
 			ARENDER(pctl, string_array, nvl, name, val, nelem);
 			break;
@@ -867,7 +852,7 @@ dump_nvlist(nvlist_t *list, int indent)
 			break;
 
 		case DATA_TYPE_STRING:
-			NVP(elem, string, const char *, const char *, "'%s'");
+			NVP(elem, string, char *, char *, "'%s'");
 			break;
 
 		case DATA_TYPE_BYTE_ARRAY:
@@ -908,8 +893,7 @@ dump_nvlist(nvlist_t *list, int indent)
 			break;
 
 		case DATA_TYPE_STRING_ARRAY:
-			NVPA(elem, string_array, const char *, const char *,
-			    "'%s'");
+			NVPA(elem, string_array, char *, char *, "'%s'");
 			break;
 
 		case DATA_TYPE_NVLIST:
@@ -963,11 +947,11 @@ dump_nvlist(nvlist_t *list, int indent)
  */
 int
 nvpair_value_match_regex(nvpair_t *nvp, int ai,
-    const char *value, regex_t *value_regex, const char **ep)
+    char *value, regex_t *value_regex, char **ep)
 {
-	const char	*evalue;
-	uint_t		a_len;
-	int		sr;
+	char	*evalue;
+	uint_t	a_len;
+	int	sr;
 
 	if (ep)
 		*ep = NULL;
@@ -995,7 +979,7 @@ nvpair_value_match_regex(nvpair_t *nvp, int ai,
 	sr = EOF;
 	switch (nvpair_type(nvp)) {
 	case DATA_TYPE_STRING: {
-		const char *val;
+		char	*val;
 
 		/* check string value for match */
 		if (nvpair_value_string(nvp, &val) == 0) {
@@ -1011,7 +995,7 @@ nvpair_value_match_regex(nvpair_t *nvp, int ai,
 		break;
 	}
 	case DATA_TYPE_STRING_ARRAY: {
-		const char **val_array;
+		char **val_array;
 
 		/* check indexed string value of array for match */
 		if ((nvpair_value_string_array(nvp, &val_array, &a_len) == 0) &&
@@ -1287,7 +1271,7 @@ nvpair_value_match_regex(nvpair_t *nvp, int ai,
 }
 
 int
-nvpair_value_match(nvpair_t *nvp, int ai, const char *value, const char **ep)
+nvpair_value_match(nvpair_t *nvp, int ai, char *value, char **ep)
 {
 	return (nvpair_value_match_regex(nvp, ai, value, NULL, ep));
 }

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <thread_pool.h>
 
 #include <libzfs.h>
@@ -60,13 +60,12 @@ struct zpool_list {
 	uu_avl_t	*zl_avl;
 	uu_avl_pool_t	*zl_pool;
 	zprop_list_t	**zl_proplist;
-	zfs_type_t	zl_type;
 };
 
+/* ARGSUSED */
 static int
 zpool_compare(const void *larg, const void *rarg, void *unused)
 {
-	(void) unused;
 	zpool_handle_t *l = ((zpool_node_t *)larg)->zn_handle;
 	zpool_handle_t *r = ((zpool_node_t *)rarg)->zn_handle;
 	const char *lname = zpool_get_name(l);
@@ -91,7 +90,8 @@ add_pool(zpool_handle_t *zhp, void *data)
 	if (uu_avl_find(zlp->zl_avl, node, NULL, &idx) == NULL) {
 		if (zlp->zl_proplist &&
 		    zpool_expand_proplist(zhp, zlp->zl_proplist,
-		    zlp->zl_type, zlp->zl_literal) != 0) {
+		    zlp->zl_literal)
+		    != 0) {
 			zpool_close(zhp);
 			free(node);
 			return (-1);
@@ -113,7 +113,7 @@ add_pool(zpool_handle_t *zhp, void *data)
  * line.
  */
 zpool_list_t *
-pool_list_get(int argc, char **argv, zprop_list_t **proplist, zfs_type_t type,
+pool_list_get(int argc, char **argv, zprop_list_t **proplist,
     boolean_t literal, int *err)
 {
 	zpool_list_t *zlp;
@@ -131,7 +131,6 @@ pool_list_get(int argc, char **argv, zprop_list_t **proplist, zfs_type_t type,
 		zpool_no_memory();
 
 	zlp->zl_proplist = proplist;
-	zlp->zl_type = type;
 
 	zlp->zl_literal = literal;
 
@@ -249,20 +248,63 @@ pool_list_count(zpool_list_t *zlp)
  */
 int
 for_each_pool(int argc, char **argv, boolean_t unavail,
-    zprop_list_t **proplist, zfs_type_t type, boolean_t literal,
-    zpool_iter_f func, void *data)
+    zprop_list_t **proplist, boolean_t literal, zpool_iter_f func, void *data)
 {
 	zpool_list_t *list;
 	int ret = 0;
 
-	if ((list = pool_list_get(argc, argv, proplist, type, literal,
-	    &ret)) == NULL)
+	if ((list = pool_list_get(argc, argv, proplist, literal, &ret)) == NULL)
 		return (1);
 
 	if (pool_list_iter(list, unavail, func, data) != 0)
 		ret = 1;
 
 	pool_list_free(list);
+
+	return (ret);
+}
+
+static int
+for_each_vdev_cb(zpool_handle_t *zhp, nvlist_t *nv, pool_vdev_iter_f func,
+    void *data)
+{
+	nvlist_t **child;
+	uint_t c, children;
+	int ret = 0;
+	int i;
+	char *type;
+
+	const char *list[] = {
+	    ZPOOL_CONFIG_SPARES,
+	    ZPOOL_CONFIG_L2CACHE,
+	    ZPOOL_CONFIG_CHILDREN
+	};
+
+	for (i = 0; i < ARRAY_SIZE(list); i++) {
+		if (nvlist_lookup_nvlist_array(nv, list[i], &child,
+		    &children) == 0) {
+			for (c = 0; c < children; c++) {
+				uint64_t ishole = 0;
+
+				(void) nvlist_lookup_uint64(child[c],
+				    ZPOOL_CONFIG_IS_HOLE, &ishole);
+
+				if (ishole)
+					continue;
+
+				ret |= for_each_vdev_cb(zhp, child[c], func,
+				    data);
+			}
+		}
+	}
+
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
+		return (ret);
+
+	/* Don't run our function on root vdevs */
+	if (strcmp(type, VDEV_TYPE_ROOT) != 0) {
+		ret |= func(zhp, nv, data);
+	}
 
 	return (ret);
 }
@@ -285,7 +327,7 @@ for_each_vdev(zpool_handle_t *zhp, pool_vdev_iter_f func, void *data)
 		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 		    &nvroot) == 0);
 	}
-	return (for_each_vdev_cb((void *) zhp, nvroot, func, data));
+	return (for_each_vdev_cb(zhp, nvroot, func, data));
 }
 
 /*
@@ -442,23 +484,39 @@ static void
 vdev_run_cmd(vdev_cmd_data_t *data, char *cmd)
 {
 	int rc;
-	char *argv[2] = {cmd};
-	char **env;
+	char *argv[2] = {cmd, 0};
+	char *env[5] = {"PATH=/bin:/sbin:/usr/bin:/usr/sbin", NULL, NULL, NULL,
+	    NULL};
 	char **lines = NULL;
 	int lines_cnt = 0;
 	int i;
 
-	env = zpool_vdev_script_alloc_env(data->pool, data->path, data->upath,
-	    data->vdev_enc_sysfs_path, NULL, NULL);
-	if (env == NULL)
+	/* Setup our custom environment variables */
+	rc = asprintf(&env[1], "VDEV_PATH=%s",
+	    data->path ? data->path : "");
+	if (rc == -1) {
+		env[1] = NULL;
 		goto out;
+	}
+
+	rc = asprintf(&env[2], "VDEV_UPATH=%s",
+	    data->upath ? data->upath : "");
+	if (rc == -1) {
+		env[2] = NULL;
+		goto out;
+	}
+
+	rc = asprintf(&env[3], "VDEV_ENC_SYSFS_PATH=%s",
+	    data->vdev_enc_sysfs_path ?
+	    data->vdev_enc_sysfs_path : "");
+	if (rc == -1) {
+		env[3] = NULL;
+		goto out;
+	}
 
 	/* Run the command */
 	rc = libzfs_run_process_get_stdout_nopath(cmd, argv, env, &lines,
 	    &lines_cnt);
-
-	zpool_vdev_script_free_env(env);
-
 	if (rc != 0)
 		goto out;
 
@@ -470,6 +528,10 @@ vdev_run_cmd(vdev_cmd_data_t *data, char *cmd)
 out:
 	if (lines != NULL)
 		libzfs_free_str_array(lines, lines_cnt);
+
+	/* Start with i = 1 since env[0] was statically allocated */
+	for (i = 1; i < ARRAY_SIZE(env); i++)
+		free(env[i]);
 }
 
 /*
@@ -541,22 +603,17 @@ vdev_run_cmd_thread(void *cb_cmd_data)
 
 /* For each vdev in the pool run a command */
 static int
-for_each_vdev_run_cb(void *zhp_data, nvlist_t *nv, void *cb_vcdl)
+for_each_vdev_run_cb(zpool_handle_t *zhp, nvlist_t *nv, void *cb_vcdl)
 {
 	vdev_cmd_data_list_t *vcdl = cb_vcdl;
 	vdev_cmd_data_t *data;
-	const char *path = NULL;
+	char *path = NULL;
 	char *vname = NULL;
-	const char *vdev_enc_sysfs_path = NULL;
+	char *vdev_enc_sysfs_path = NULL;
 	int i, match = 0;
-	zpool_handle_t *zhp = zhp_data;
 
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) != 0)
 		return (1);
-
-	/* Make sure we're getting the updated enclosure sysfs path */
-	update_vdev_config_dev_sysfs_path(nv, path,
-	    ZPOOL_CONFIG_VDEV_ENC_SYSFS_PATH);
 
 	nvlist_lookup_string(nv, ZPOOL_CONFIG_VDEV_ENC_SYSFS_PATH,
 	    &vdev_enc_sysfs_path);
@@ -665,8 +722,8 @@ all_pools_for_each_vdev_run(int argc, char **argv, char *cmd,
 	vcdl->g_zfs = g_zfs;
 
 	/* Gather our list of all vdevs in all pools */
-	for_each_pool(argc, argv, B_TRUE, NULL, ZFS_TYPE_POOL,
-	    B_FALSE, all_pools_for_each_vdev_gather_cb, vcdl);
+	for_each_pool(argc, argv, B_TRUE, NULL, B_FALSE,
+	    all_pools_for_each_vdev_gather_cb, vcdl);
 
 	/* Run command on all vdevs in all pools */
 	all_pools_for_each_vdev_run_vcdl(vcdl);

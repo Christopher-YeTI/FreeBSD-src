@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -108,8 +108,5 @@
 #define	MNTOPT_NOACL	"noacl"		/* likewise */
 #define	MNTOPT_POSIXACL	"posixacl"	/* likewise */
 #define	MNTOPT_MNTPOINT	"mntpoint"	/* mount point hint */
-#define	MNTOPT_CASESENSITIVE	"casesensitive"		/* case sensitivity */
-#define	MNTOPT_CASEINSENSITIVE	"caseinsensitive"	/* case insensitivity */
-#define	MNTOPT_CASEMIXED	"casemixed"		/* case mixed */
 
 #endif	/* _SYS_MNTENT_H */

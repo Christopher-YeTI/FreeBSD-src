@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -79,7 +79,7 @@ function cleanup
 
 	cleanup_filesystem $TESTPOOL1 $TESTFS
 
-	destroy_pool $TESTPOOL1
+        destroy_pool $TESTPOOL1
 
 	[[ -d $ALTER_ROOT ]] && \
 		log_must rm -rf $ALTER_ROOT
@@ -91,7 +91,7 @@ log_assert "Verify that an exported pool can be imported."
 
 setup_filesystem "$DEVICE_FILES" $TESTPOOL1 $TESTFS $TESTDIR1
 
-read -r checksum1 _ < <(cksum $MYTESTFILE)
+checksum1=$(sum $MYTESTFILE | awk '{print $1}')
 
 typeset -i i=0
 typeset -i j=0
@@ -125,8 +125,9 @@ while (( i < ${#pools[*]} )); do
 		[[ ! -e $basedir/$TESTFILE0 ]] && \
 			log_fail "$basedir/$TESTFILE0 missing after import."
 
-		read -r checksum2 _ < <(cksum $basedir/$TESTFILE0)
-		log_must [ "$checksum1" = "$checksum2" ]
+		checksum2=$(sum $basedir/$TESTFILE0 | awk '{print $1}')
+		[[ "$checksum1" != "$checksum2" ]] && \
+			log_fail "Checksums differ ($checksum1 != $checksum2)"
 
 		((j = j + 1))
 	done

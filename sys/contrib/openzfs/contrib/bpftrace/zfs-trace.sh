@@ -1,7 +1,6 @@
 #!/bin/sh
 
-read -r ZVER < /sys/module/zfs/version
-ZVER="${ZVER%%-*}"
+ZVER=$(cut -f 1 -d '-' /sys/module/zfs/version)
 KVER=$(uname -r)
 
 exec bpftrace \

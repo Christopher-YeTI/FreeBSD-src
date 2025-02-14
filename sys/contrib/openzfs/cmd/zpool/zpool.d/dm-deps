@@ -9,7 +9,6 @@ if [ "$1" = "-h" ] ; then
 	exit
 fi
 
-# shellcheck disable=SC2154
 dev="$VDEV_PATH"
 
 # If the VDEV path is a symlink, resolve it to a real device
@@ -17,12 +16,14 @@ if [ -L "$dev" ] ; then
 	dev=$(readlink "$dev")
 fi
 
-dev="${dev##*/}"
+dev=$(basename "$dev")
 val=""
 if [ -d "/sys/class/block/$dev/slaves" ] ; then
-	# ls -C: output in columns, no newlines, two spaces (change to one)
-	# shellcheck disable=SC2012
-	val=$(ls -C "/sys/class/block/$dev/slaves" | tr -s '[:space:]' ' ')
+	# ls -C: output in columns, no newlines
+	val=$(ls -C "/sys/class/block/$dev/slaves")
+
+	# ls -C will print two spaces between files; change to one space.
+	val=$(echo "$val" | sed -r 's/[[:blank:]]+/ /g')
 fi
 
 echo "dm-deps=$val"

@@ -36,8 +36,6 @@
 
 verify_runnable "global"
 
-command -v fio > /dev/null || log_unsupported "fio missing"
-
 log_assert "Trim of L2ARC succeeds."
 
 function cleanup
@@ -67,7 +65,7 @@ typeset VDEV_MIN_MB=$((MINVDEVSIZE * 0.30 / 1024 / 1024))
 log_must zpool create -f $TESTPOOL $TRIM_VDEV1 cache $TRIM_VDEV2
 verify_vdevs "-le" "$VDEV_MIN_MB" $TRIM_VDEV2
 
-typeset fill_mb=$(( floor(3 * MINVDEVSIZE) ))
+typeset fill_mb=$(( floor(2 * MINVDEVSIZE) ))
 export DIRECTORY=/$TESTPOOL
 export NUMJOBS=1
 export FILE_SIZE=${fill_mb}
@@ -77,7 +75,7 @@ export PERF_COMPCHUNK=0
 export RUNTIME=30
 export BLOCKSIZE=128K
 export SYNC_TYPE=0
-export DIRECT=0
+export DIRECT=1
 
 # Write to the pool.
 log_must fio $FIO_SCRIPTS/mkfiles.fio
@@ -97,8 +95,8 @@ done
 
 verify_trim_io $TESTPOOL "ind" 5 $TRIM_VDEV2
 
-typeset cache_size cache_alloc _
-read -r _ cache_size cache_alloc _ < <(zpool list -vp | grep $TRIM_VDEV2)
+typeset cache_size=$(zpool list -vp | grep $TRIM_VDEV2 | awk '{print $2}')
+typeset cache_alloc=$(zpool list -vp | grep $TRIM_VDEV2 | awk '{print $3}')
 
 log_must test $cache_alloc -lt $cache_size
 

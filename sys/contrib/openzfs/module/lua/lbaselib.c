@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lbaselib.c,v 1.276.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Basic library
@@ -292,3 +293,4 @@ LUAMOD_API int luaopen_base (lua_State *L) {
 EXPORT_SYMBOL(luaopen_base);
 
 #endif
+/* END CSTYLED */

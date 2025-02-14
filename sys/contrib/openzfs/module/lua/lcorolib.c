@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lcorolib.c,v 1.5.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Coroutine Library
@@ -155,3 +156,4 @@ LUAMOD_API int luaopen_coroutine (lua_State *L) {
 EXPORT_SYMBOL(luaopen_coroutine);
 
 #endif
+/* END CSTYLED */

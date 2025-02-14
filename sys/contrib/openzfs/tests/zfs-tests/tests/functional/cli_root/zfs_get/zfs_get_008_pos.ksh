@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -53,13 +53,18 @@ set -A options " " "-r" "-H" "-p" "-rHp" "-o name" \
 set -A props type used available creation volsize referenced compressratio \
 	mounted origin recordsize quota reservation mountpoint sharenfs \
 	checksum compression atime devices exec readonly setuid snapdir \
-	aclinherit canmount primarycache secondarycache version \
+	aclinherit canmount primarycache secondarycache \
 	usedbychildren usedbydataset usedbyrefreservation usedbysnapshots \
 	userquota@root groupquota@root userused@root groupused@root
 if is_freebsd; then
 	set -A props ${props[*]} jailed aclmode
 else
 	set -A props ${props[*]} zoned acltype
+fi
+
+zfs upgrade -v > /dev/null 2>&1
+if [[ $? -eq 0 ]]; then
+	set -A props ${props[*]} version
 fi
 
 set -A dataset $TESTPOOL/$TESTCTR $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL \

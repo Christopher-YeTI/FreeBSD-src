@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -35,7 +35,6 @@
 # STRATEGY:
 #	1. Prepare an appropriate ACL on the test directory
 #	2. Change the owner of the directory
-#	3. Reset and set the ACLs for test directory owned by the user
 #
 
 verify_runnable "both"
@@ -45,8 +44,6 @@ log_must setfacl -d -m u:$ZFS_ACL_STAFF1:rwx $TESTDIR
 log_must setfacl -b $TESTDIR
 
 log_must chown $ZFS_ACL_STAFF1 $TESTDIR
-log_must setfacl -b $TESTDIR
-log_must setfacl -d -m u:$ZFS_ACL_STAFF1:rwx $TESTDIR
 log_must chown 0 $TESTDIR
 
 log_pass "chown works with POSIX ACLs"

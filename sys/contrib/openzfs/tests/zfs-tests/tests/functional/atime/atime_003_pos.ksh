@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -62,7 +62,6 @@ do
 	else
 		log_must zfs set atime=on $dst
 		log_must zfs set relatime=on $dst
-
 		log_must check_atime_updated $mtpt/$TESTFILE
 		log_mustnot check_atime_updated $mtpt/$TESTFILE
 	fi

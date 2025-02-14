@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -41,6 +41,7 @@ extern "C" {
  * similar environment.
  */
 #if defined(__KERNEL__) || defined(_STANDALONE)
+#include <sys/note.h>
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/sysmacros.h>
@@ -50,13 +51,12 @@ extern "C" {
 #include <sys/kmem.h>
 #include <sys/kmem_cache.h>
 #include <sys/vmem.h>
-#include <sys/misc.h>
 #include <sys/taskq.h>
 #include <sys/param.h>
 #include <sys/disp.h>
 #include <sys/debug.h>
 #include <sys/random.h>
-#include <sys/string.h>
+#include <sys/strings.h>
 #include <sys/byteorder.h>
 #include <sys/list.h>
 #include <sys/time.h>
@@ -92,6 +92,7 @@ extern "C" {
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <assert.h>
@@ -103,6 +104,7 @@ extern "C" {
 #include <ctype.h>
 #include <signal.h>
 #include <sys/mman.h>
+#include <sys/note.h>
 #include <sys/types.h>
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
@@ -151,16 +153,14 @@ extern "C" {
 
 extern void dprintf_setup(int *argc, char **argv);
 
-extern void cmn_err(int, const char *, ...)
-    __attribute__((format(printf, 2, 3)));
-extern void vcmn_err(int, const char *, va_list)
-    __attribute__((format(printf, 2, 0)));
-extern void panic(const char *, ...)
-    __attribute__((format(printf, 1, 2), noreturn));
-extern void vpanic(const char *, va_list)
-    __attribute__((format(printf, 1, 0), noreturn));
+extern void cmn_err(int, const char *, ...);
+extern void vcmn_err(int, const char *, va_list);
+extern void panic(const char *, ...)  __NORETURN;
+extern void vpanic(const char *, va_list)  __NORETURN;
 
 #define	fm_panic	panic
+
+extern int aok;
 
 /*
  * DTrace SDT probes have different signatures in userland than they do in
@@ -224,13 +224,14 @@ typedef pthread_t	kthread_t;
 #define	TS_JOINABLE	0x00000004
 
 #define	curthread	((void *)(uintptr_t)pthread_self())
+#define	kpreempt(x)	yield()
 #define	getcomm()	"unknown"
 
 #define	thread_create_named(name, stk, stksize, func, arg, len, \
     pp, state, pri)	\
-	zk_thread_create(name, func, arg, stksize, state)
+	zk_thread_create(func, arg, stksize, state)
 #define	thread_create(stk, stksize, func, arg, len, pp, state, pri)	\
-	zk_thread_create(#func, func, arg, stksize, state)
+	zk_thread_create(func, arg, stksize, state)
 #define	thread_exit()	pthread_exit(NULL)
 #define	thread_join(t)	pthread_join((pthread_t)(t), NULL)
 
@@ -246,16 +247,15 @@ extern struct proc p0;
 
 #define	PS_NONE		-1
 
-extern kthread_t *zk_thread_create(const char *name, void (*func)(void *),
-    void *arg, size_t stksize, int state);
+extern kthread_t *zk_thread_create(void (*func)(void *), void *arg,
+    size_t stksize, int state);
 
-#define	issig()		(FALSE)
+#define	issig(why)	(FALSE)
+#define	ISSIG(thr, why)	(FALSE)
 
-#define	KPREEMPT_SYNC		(-1)
-
-#define	kpreempt(x)		sched_yield()
 #define	kpreempt_disable()	((void)0)
 #define	kpreempt_enable()	((void)0)
+#define	cond_resched()		sched_yield()
 
 /*
  * Mutexes
@@ -273,13 +273,11 @@ typedef struct kmutex {
 extern void mutex_init(kmutex_t *mp, char *name, int type, void *cookie);
 extern void mutex_destroy(kmutex_t *mp);
 extern void mutex_enter(kmutex_t *mp);
-extern int mutex_enter_check_return(kmutex_t *mp);
 extern void mutex_exit(kmutex_t *mp);
 extern int mutex_tryenter(kmutex_t *mp);
 
 #define	NESTED_SINGLE 1
 #define	mutex_enter_nested(mp, class) mutex_enter(mp)
-#define	mutex_enter_interruptible(mp) mutex_enter_check_return(mp)
 /*
  * RW locks
  */
@@ -413,7 +411,6 @@ void procfs_list_add(procfs_list_t *procfs_list, void *p);
 #define	KM_NORMALPRI		0	/* not needed with UMEM_DEFAULT */
 #define	KMC_NODEBUG		UMC_NODEBUG
 #define	KMC_KVMEM		0x0
-#define	KMC_RECLAIMABLE		0x0
 #define	kmem_alloc(_s, _f)	umem_alloc(_s, _f)
 #define	kmem_zalloc(_s, _f)	umem_zalloc(_s, _f)
 #define	kmem_free(_b, _s)	umem_free(_b, _s)
@@ -496,12 +493,10 @@ extern taskq_t *system_taskq;
 extern taskq_t *system_delay_taskq;
 
 extern taskq_t	*taskq_create(const char *, int, pri_t, int, int, uint_t);
-extern taskq_t	*taskq_create_synced(const char *, int, pri_t, int, int, uint_t,
-    kthread_t ***);
 #define	taskq_create_proc(a, b, c, d, e, p, f) \
 	    (taskq_create(a, b, c, d, e, f))
 #define	taskq_create_sysdc(a, b, d, e, p, dc, f) \
-	    ((void) sizeof (dc), taskq_create(a, b, maxclsyspri, d, e, f))
+	    (taskq_create(a, b, maxclsyspri, d, e, f))
 extern taskqid_t taskq_dispatch(taskq_t *, task_func_t, void *, uint_t);
 extern taskqid_t taskq_dispatch_delay(taskq_t *, task_func_t, void *, uint_t,
     clock_t);
@@ -655,7 +650,7 @@ random_in_range(uint32_t range)
 	if (range == 1)
 		return (0);
 
-	(void) random_get_pseudo_bytes((uint8_t *)&r, sizeof (r));
+	(void) random_get_pseudo_bytes((void *)&r, sizeof (r));
 
 	return (r % range);
 }
@@ -699,14 +694,13 @@ extern char *kmem_asprintf(const char *fmt, ...);
 #define	kmem_strfree(str) kmem_free((str), strlen(str) + 1)
 #define	kmem_strdup(s)  strdup(s)
 
-#ifndef __cplusplus
-extern int kmem_scnprintf(char *restrict str, size_t size,
-    const char *restrict fmt, ...);
-#endif
-
 /*
  * Hostname information
  */
+extern char hw_serial[];	/* for userland-emulated hostid access */
+extern int ddi_strtoul(const char *str, char **nptr, int base,
+    unsigned long *result);
+
 extern int ddi_strtoull(const char *str, char **nptr, int base,
     u_longlong_t *result);
 
@@ -776,6 +770,7 @@ extern void spl_fstrans_unmark(fstrans_cookie_t);
 extern int __spl_pf_fstrans_check(void);
 extern int kmem_cache_reap_active(void);
 
+#define	____cacheline_aligned
 
 /*
  * Kernel modules

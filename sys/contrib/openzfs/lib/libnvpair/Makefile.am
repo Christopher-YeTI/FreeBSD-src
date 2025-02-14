@@ -1,26 +1,35 @@
-libnvpair_la_CFLAGS  = $(AM_CFLAGS) $(KERNEL_CFLAGS) $(LIBRARY_CFLAGS)
-libnvpair_la_CFLAGS += $(LIBTIRPC_CFLAGS)
-libnvpair_la_CFLAGS += -fvisibility=hidden
+include $(top_srcdir)/config/Rules.am
 
-# wchar_t is undefined-signedness, but we compare to >=0; this warns with unsigned wchar_t
-%D%/libnvpair_la-libnvpair_json.$(OBJEXT) : CFLAGS += -Wno-type-limits
-%D%/libnvpair_la-libnvpair_json.l$(OBJEXT): CFLAGS += -Wno-type-limits
+VPATH = \
+	$(top_srcdir)/module/nvpair \
+	$(top_srcdir)/lib/libnvpair
 
-lib_LTLIBRARIES += libnvpair.la
-CPPCHECKTARGETS += libnvpair.la
+# Includes kernel code, generate warnings for large stack frames
+# and required CFLAGS for libtirpc
+AM_CFLAGS += $(FRAME_LARGER_THAN) $(LIBTIRPC_CFLAGS)
+
+lib_LTLIBRARIES = libnvpair.la
+
+include $(top_srcdir)/config/Abigail.am
+
+USER_C = \
+	libnvpair.c \
+	libnvpair_json.c \
+	nvpair_alloc_system.c
+
+KERNEL_C = \
+	nvpair_alloc_fixed.c \
+	nvpair.c \
+	fnvpair.c
 
 dist_libnvpair_la_SOURCES = \
-	%D%/libnvpair.c \
-	%D%/libnvpair_json.c \
-	%D%/nvpair_alloc_system.c
+	$(USER_C)
 
 nodist_libnvpair_la_SOURCES = \
-	module/nvpair/nvpair_alloc_fixed.c \
-	module/nvpair/nvpair.c \
-	module/nvpair/fnvpair.c
+	$(KERNEL_C)
 
 libnvpair_la_LIBADD = \
-	libspl_assert.la
+	$(abs_top_builddir)/lib/libspl/libspl_assert.la
 
 libnvpair_la_LIBADD += $(LIBTIRPC_LIBS) $(LTLIBINTL)
 
@@ -32,4 +41,7 @@ endif
 
 libnvpair_la_LDFLAGS += -version-info 3:0:0
 
-dist_noinst_DATA += %D%/libnvpair.abi %D%/libnvpair.suppr
+include $(top_srcdir)/config/CppCheck.am
+
+# Library ABI
+EXTRA_DIST = libnvpair.abi libnvpair.suppr

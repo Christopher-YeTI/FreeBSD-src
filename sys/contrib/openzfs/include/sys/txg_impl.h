@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -73,7 +73,8 @@ struct tx_cpu {
 	kcondvar_t	tc_cv[TXG_SIZE];
 	uint64_t	tc_count[TXG_SIZE];	/* tx hold count on each txg */
 	list_t		tc_callbacks[TXG_SIZE]; /* commit cb list */
-} ____cacheline_aligned;
+	char		tc_pad[8];		/* pad to fill 3 cache lines */
+};
 
 /*
  * The tx_state structure maintains the state information about the different

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -36,7 +36,9 @@ static
 void
 zfs_oldace_byteswap(ace_t *ace, int ace_cnt)
 {
-	for (int i = 0; i != ace_cnt; i++, ace++) {
+	int i;
+
+	for (i = 0; i != ace_cnt; i++, ace++) {
 		ace->a_who = BSWAP_32(ace->a_who);
 		ace->a_access_mask = BSWAP_32(ace->a_access_mask);
 		ace->a_flags = BSWAP_16(ace->a_flags);
@@ -136,16 +138,23 @@ zfs_ace_byteswap(void *buf, size_t size, boolean_t zfs_layout)
 	}
 }
 
+/* ARGSUSED */
 void
 zfs_oldacl_byteswap(void *buf, size_t size)
 {
+	int cnt;
+
 	/*
 	 * Arggh, since we don't know how many ACEs are in
 	 * the array, we have to swap the entire block
 	 */
-	zfs_oldace_byteswap((ace_t *)buf, size / sizeof (ace_t));
+
+	cnt = size / sizeof (ace_t);
+
+	zfs_oldace_byteswap((ace_t *)buf, cnt);
 }
 
+/* ARGSUSED */
 void
 zfs_acl_byteswap(void *buf, size_t size)
 {

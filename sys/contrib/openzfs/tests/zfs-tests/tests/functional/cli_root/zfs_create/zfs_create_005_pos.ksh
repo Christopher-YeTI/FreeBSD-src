@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,16 +48,15 @@ verify_runnable "both"
 
 function cleanup
 {
-	datasetexists $TESTPOOL/$TESTFS1 &&
-		destroy_dataset $TESTPOOL/$TESTFS1 -f
-	log_must rm -df "/tmp/mnt$$"
+	datasetexists $TESTPOOL/$TESTFS1 && \
+		log_must zfs destroy -f $TESTPOOL/$TESTFS1
 }
 
 log_onexit cleanup
 
 
-log_assert "'zfs create -o property=value filesystem' can successfully create" \
-	   "a ZFS filesystem with multiple properties set."
+log_assert "'zfs create -o property=value filesystem' can successfully create \
+	   a ZFS filesystem with multiple properties set."
 
 typeset -i i=0
 typeset opts=""
@@ -70,15 +69,17 @@ while (( $i < ${#RW_FS_PROP[*]} )); do
 done
 
 log_must zfs create $opts $TESTPOOL/$TESTFS1
-log_must datasetexists $TESTPOOL/$TESTFS1
+datasetexists $TESTPOOL/$TESTFS1 || \
+	log_fail "zfs create $TESTPOOL/$TESTFS1 fail."
 
 i=0
 while (( $i < ${#RW_FS_PROP[*]} )); do
         if [[ ${RW_FS_PROP[$i]} != *"checksum"* ]]; then
-		log_must propertycheck $TESTPOOL/$TESTFS1 ${RW_FS_PROP[i]}
+		propertycheck $TESTPOOL/$TESTFS1 ${RW_FS_PROP[i]} || \
+			log_fail "${RW_FS_PROP[i]} is failed to set."
 	fi
 	(( i = i + 1 ))
 done
 
-log_pass "'zfs create -o property=value filesystem' can successfully create" \
-         "a ZFS filesystem with multiple properties set."
+log_pass "'zfs create -o property=value filesystem' can successfully create \
+         a ZFS filesystem with multiple properties set."

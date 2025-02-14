@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -58,12 +58,12 @@ mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
 
 # 1. Write some data and detach the first drive so it has resilver work to do
 log_must file_write -b 524288 -c 1024 -o create -d 0 -f $mntpnt/biggerfile1
-sync_all_pools
+log_must sync
 log_must zpool detach $TESTPOOL $DISK2
 
 # 2. Repeat the process with a second disk
 log_must file_write -b 524288 -c 1024 -o create -d 0 -f $mntpnt/biggerfile2
-sync_all_pools
+log_must sync
 log_must zpool detach $TESTPOOL $DISK3
 
 # 3. Reattach the drives, causing the second drive's resilver to be deferred

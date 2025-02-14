@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,9 +48,11 @@ function cleanup
 {
 	typeset -i i=0
 
-	datasetexists $rst_root && destroy_dataset $rst_root -Rf
+	datasetexists $rst_root && \
+		log_must zfs destroy -Rf $rst_root
 	while (( i < 2 )); do
-		snapexists ${orig_snap[$i]} && destroy_dataset ${orig_snap[$i]} -f
+		snapexists ${orig_snap[$i]} && \
+			log_must zfs destroy -f ${orig_snap[$i]}
 		log_must rm -f ${bkup[$i]}
 
 		(( i = i + 1 ))
@@ -61,7 +63,8 @@ function cleanup
 
 function recreate_root
 {
-	datasetexists $rst_root && destroy_dataset $rst_root -Rf
+	datasetexists $rst_root && \
+		log_must zfs destroy -Rf $rst_root
 	if [[ -d $TESTDIR1 ]] ; then
 		log_must rm -rf $TESTDIR1
 	fi
@@ -105,7 +108,10 @@ for orig_fs in $datasets ; do
 
 	typeset -i i=0
 	while (( i < ${#orig_snap[*]} )); do
-		log_must eval "file_write -o create -f ${orig_data[$i]} -b 512 -c 8 >/dev/null 2>&1"
+		file_write -o create -f ${orig_data[$i]} -b 512 \
+		    -c 8 >/dev/null 2>&1
+		(( $? != 0 )) && \
+			log_fail "Writing data into zfs filesystem fails."
 		log_must zfs snapshot ${orig_snap[$i]}
 		if (( i < 1 )); then
 			log_must eval "zfs send ${orig_snap[$i]} > ${bkup[$i]}"

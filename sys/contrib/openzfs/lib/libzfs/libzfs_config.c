@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -50,22 +50,22 @@
 
 #include "libzfs_impl.h"
 
-#define TEXT_DOMAIN "zfs"
-
 typedef struct config_node {
 	char		*cn_name;
 	nvlist_t	*cn_config;
 	uu_avl_node_t	cn_avl;
 } config_node_t;
 
+/* ARGSUSED */
 static int
 config_node_compare(const void *a, const void *b, void *unused)
 {
-	(void) unused;
+	int ret;
+
 	const config_node_t *ca = (config_node_t *)a;
 	const config_node_t *cb = (config_node_t *)b;
 
-	int ret = strcmp(ca->cn_name, cb->cn_name);
+	ret = strcmp(ca->cn_name, cb->cn_name);
 
 	if (ret < 0)
 		return (-1);
@@ -128,7 +128,8 @@ namespace_reload(libzfs_handle_t *hdl)
 			return (no_memory(hdl));
 	}
 
-	zcmd_alloc_dst_nvlist(hdl, &zc, 0);
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
+		return (-1);
 
 	for (;;) {
 		zc.zc_cookie = hdl->libzfs_ns_gen;
@@ -142,7 +143,10 @@ namespace_reload(libzfs_handle_t *hdl)
 				return (0);
 
 			case ENOMEM:
-				zcmd_expand_dst_nvlist(hdl, &zc);
+				if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+					zcmd_free_nvlists(&zc);
+					return (-1);
+				}
 				break;
 
 			default:
@@ -179,9 +183,19 @@ namespace_reload(libzfs_handle_t *hdl)
 		nvlist_t *child;
 		uu_avl_index_t where;
 
-		cn = zfs_alloc(hdl, sizeof (config_node_t));
-		cn->cn_name = zfs_strdup(hdl, nvpair_name(elem));
-		child = fnvpair_value_nvlist(elem);
+		if ((cn = zfs_alloc(hdl, sizeof (config_node_t))) == NULL) {
+			nvlist_free(config);
+			return (-1);
+		}
+
+		if ((cn->cn_name = zfs_strdup(hdl,
+		    nvpair_name(elem))) == NULL) {
+			free(cn);
+			nvlist_free(config);
+			return (-1);
+		}
+
+		verify(nvpair_value_nvlist(elem, &child) == 0);
 		if (nvlist_dup(child, &cn->cn_config, 0) != 0) {
 			free(cn->cn_name);
 			free(cn);
@@ -261,7 +275,8 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 	if (zhp->zpool_config_size == 0)
 		zhp->zpool_config_size = 1 << 16;
 
-	zcmd_alloc_dst_nvlist(hdl, &zc, zhp->zpool_config_size);
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, zhp->zpool_config_size) != 0)
+		return (-1);
 
 	for (;;) {
 		if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_STATS,
@@ -273,9 +288,12 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 			break;
 		}
 
-		if (errno == ENOMEM)
-			zcmd_expand_dst_nvlist(hdl, &zc);
-		else {
+		if (errno == ENOMEM) {
+			if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+				zcmd_free_nvlists(&zc);
+				return (-1);
+			}
+		} else {
 			zcmd_free_nvlists(&zc);
 			if (errno == ENOENT || errno == EINVAL)
 				*missing = B_TRUE;

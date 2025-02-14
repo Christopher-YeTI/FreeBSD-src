@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -49,7 +49,9 @@ function cleanup
 	typeset ds
 
 	for ds in $fs1 $fs2 $vol1 $vol2; do
-		datasetexists $ds && destroy_dataset $ds
+		if datasetexists $ds; then
+			log_must zfs destroy $ds
+		fi
 	done
 }
 
@@ -92,13 +94,13 @@ for val in 1 2 3; do
 		fi
 		for ds in $fs2 $vol2; do
 			cmp_prop $ds $val2
-			destroy_dataset $ds
+			log_must zfs destroy $ds
 			block_device_wait
 		done
 	done
 
 	for ds in $fs1 $vol1; do
-		destroy_dataset $ds
+		log_must zfs destroy $ds
 		block_device_wait
 	done
 

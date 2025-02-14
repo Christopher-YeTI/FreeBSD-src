@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-#include <err.h>
 
 /* backward compat in case it's not defined */
 #ifndef O_TMPFILE
@@ -25,57 +24,75 @@
  *
  */
 
-static void
-run(const char *op)
-{
-	int ret;
-	char buf[50];
-	sprintf(buf, "sudo -E zpool %s $TESTPOOL", op);
-	if ((ret = system(buf)) != 0) {
-		if (ret == -1)
-			err(4, "system \"zpool %s\"", op);
-		else
-			errx(4, "zpool %s exited %d\n",
-			    op, WEXITSTATUS(ret));
-	}
-}
-
 int
-main(void)
+main(int argc, char *argv[])
 {
-	int i, fd;
+	int i, fd, ret;
 	char spath[1024], dpath[1024];
-	const char *penv[] = {"TESTDIR", "TESTFILE0"};
+	char *penv[] = {"TESTDIR", "TESTFILE0"};
+	struct stat sbuf;
 
 	(void) fprintf(stdout, "Verify O_TMPFILE file can be linked.\n");
 
 	/*
 	 * Get the environment variable values.
 	 */
-	for (i = 0; i < ARRAY_SIZE(penv); i++)
-		if ((penv[i] = getenv(penv[i])) == NULL)
-			errx(1, "getenv(penv[%d])", i);
+	for (i = 0; i < sizeof (penv) / sizeof (char *); i++) {
+		if ((penv[i] = getenv(penv[i])) == NULL) {
+			(void) fprintf(stderr, "getenv(penv[%d])\n", i);
+			exit(1);
+		}
+	}
 
 	fd = open(penv[0], O_RDWR|O_TMPFILE, 0666);
-	if (fd < 0)
-		err(2, "open(%s)", penv[0]);
+	if (fd < 0) {
+		perror("open");
+		exit(2);
+	}
 
 	snprintf(spath, 1024, "/proc/self/fd/%d", fd);
 	snprintf(dpath, 1024, "%s/%s", penv[0], penv[1]);
-	if (linkat(AT_FDCWD, spath, AT_FDCWD, dpath, AT_SYMLINK_FOLLOW) < 0)
-		err(3, "linkat");
+	if (linkat(AT_FDCWD, spath, AT_FDCWD, dpath, AT_SYMLINK_FOLLOW) < 0) {
+		perror("linkat");
+		close(fd);
+		exit(3);
+	}
 
-	run("freeze");
+	if ((ret = system("sudo zpool freeze $TESTPOOL"))) {
+		if (ret == -1)
+			perror("system \"zpool freeze\"");
+		else
+			fprintf(stderr, "zpool freeze exits with %d\n",
+			    WEXITSTATUS(ret));
+		exit(4);
+	}
 
 	close(fd);
 
-	run("export");
-	run("import");
+	if ((ret = system("sudo zpool export $TESTPOOL"))) {
+		if (ret == -1)
+			perror("system \"zpool export\"");
+		else
+			fprintf(stderr, "zpool export exits with %d\n",
+			    WEXITSTATUS(ret));
+		exit(4);
+	}
 
-	if (unlink(dpath) == -1) {
-		perror("unlink");
+	if ((ret = system("sudo zpool import $TESTPOOL"))) {
+		if (ret == -1)
+			perror("system \"zpool import\"");
+		else
+			fprintf(stderr, "zpool import exits with %d\n",
+			    WEXITSTATUS(ret));
+		exit(4);
+	}
+
+	if (stat(dpath, &sbuf) < 0) {
+		perror("stat");
+		unlink(dpath);
 		exit(5);
 	}
+	unlink(dpath);
 
 	return (0);
 }

@@ -1,3 +1,4 @@
+/* BEGIN CSTYLED */
 /*
 ** $Id: lfunc.h,v 2.8.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Auxiliary functions to manipulate prototypes and closures
@@ -12,10 +13,10 @@
 
 
 #define sizeCclosure(n)	(cast(int, sizeof(CClosure)) + \
-                         cast(int, sizeof(TValue)*((n))))
+                         cast(int, sizeof(TValue)*((n)-1)))
 
 #define sizeLclosure(n)	(cast(int, sizeof(LClosure)) + \
-                         cast(int, sizeof(TValue *)*((n))))
+                         cast(int, sizeof(TValue *)*((n)-1)))
 
 
 LUAI_FUNC Proto *luaF_newproto (lua_State *L);
@@ -31,3 +32,4 @@ LUAI_FUNC const char *luaF_getlocalname (const Proto *func, int local_number,
 
 
 #endif
+/* END CSTYLED */

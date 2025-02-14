@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -40,18 +40,11 @@
 verify_runnable "global"
 
 
-if ! $(grep -q "CONFIG_IO_URING=y" /boot/config-$(uname -r)); then
-	log_unsupported "Requires io_uring support within Kernel"
+if [[ $(linux_version) -lt $(linux_version "5.1") ]]; then
+	log_unsupported "Requires io_uring support"
 fi
 
-if [ -e /etc/os-release ] ; then
-	source /etc/os-release
-	if [ $PLATFORM_ID = "platform:el9" ]; then
-		log_unsupported "Disabled on RHEL 9 variants: fails with 'Operation not permitted'"
-	fi
-fi
-
-fio --ioengine=io_uring --parse-only || log_unsupported "fio io_uring support required"
+fio --ioengine=io_uring --parse-only || log_unsupported "io_uring support required"
 
 function cleanup
 {

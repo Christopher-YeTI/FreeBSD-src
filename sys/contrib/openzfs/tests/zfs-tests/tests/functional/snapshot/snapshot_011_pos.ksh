@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -51,15 +51,18 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists $SNAPPOOL && destroy_dataset $SNAPPOOL -r
+	snapexists $SNAPPOOL && \
+		log_must zfs destroy -r $SNAPPOOL
 
-	[ -e $TESTDIR ] && log_must rm -rf $TESTDIR/*
+	[[ -e $TESTDIR ]] && \
+		log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 }
 
 log_assert "Verify that rollback to a snapshot created by snapshot -r succeeds."
 log_onexit cleanup
 
-[ -n $TESTDIR ] && log_must rm -rf $TESTDIR/*
+[[ -n $TESTDIR ]] && \
+    log_must rm -rf $TESTDIR/* > /dev/null 2>&1
 
 typeset -i COUNT=10
 
@@ -74,7 +77,7 @@ done
 
 log_must zfs snapshot -r $SNAPPOOL
 
-FILE_COUNT=$(ls -A $SNAPDIR | wc -l)
+FILE_COUNT=`ls -Al $SNAPDIR | grep -v "total" | wc -l`
 if (( FILE_COUNT != COUNT )); then
         ls -Al $SNAPDIR
         log_fail "AFTER: $SNAPFS contains $FILE_COUNT files(s)."
@@ -94,13 +97,14 @@ done
 #
 log_must zfs rollback $SNAPFS
 
-FILE_COUNT=$(ls -A $TESTDIR/after* 2> /dev/null | wc -l)
+FILE_COUNT=`ls -Al $TESTDIR/after* 2> /dev/null | grep -v "total" | wc -l`
 if (( FILE_COUNT != 0 )); then
         ls -Al $TESTDIR
         log_fail "$TESTDIR contains $FILE_COUNT after* files(s)."
 fi
 
-FILE_COUNT=$(ls -A $TESTDIR/before* 2> /dev/null | wc -l)
+FILE_COUNT=`ls -Al $TESTDIR/before* 2> /dev/null \
+    | grep -v "total" | wc -l`
 if (( FILE_COUNT != $COUNT )); then
 	ls -Al $TESTDIR
 	log_fail "$TESTDIR contains $FILE_COUNT before* files(s)."

@@ -7,7 +7,7 @@
  * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -21,9 +21,8 @@
  */
 
 #include <unistd.h>
-#include <sys/param.h>
 
-static size_t pagesize = 0;
+size_t pagesize = 0;
 
 size_t
 spl_pagesize(void)

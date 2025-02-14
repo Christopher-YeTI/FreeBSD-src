@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -41,7 +41,6 @@ extern void vdev_trim_stop_all(vdev_t *vd, vdev_trim_state_t tgt_state);
 extern void vdev_trim_stop_wait(spa_t *spa, list_t *vd_list);
 extern void vdev_trim_restart(vdev_t *vd);
 extern void vdev_autotrim(spa_t *spa);
-extern void vdev_autotrim_kick(spa_t *spa);
 extern void vdev_autotrim_stop_all(spa_t *spa);
 extern void vdev_autotrim_stop_wait(vdev_t *vd);
 extern void vdev_autotrim_restart(spa_t *spa);

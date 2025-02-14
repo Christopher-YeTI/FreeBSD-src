@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -91,6 +91,39 @@ typedef struct kstat {
 	int		(*ks_snapshot)(struct kstat *, void *, int);
 	void		*ks_lock;	/* protects this kstat's data */
 } kstat_t;
+
+#ifdef _SYSCALL32
+
+typedef int32_t kid32_t;
+
+typedef struct kstat32 {
+	/*
+	 * Fields relevant to both kernel and user
+	 */
+	hrtime_t	ks_crtime;
+	caddr32_t	ks_next;		/* struct kstat pointer */
+	kid32_t		ks_kid;
+	char		ks_module[KSTAT_STRLEN];
+	uint8_t		ks_resv;
+	int32_t		ks_instance;
+	char		ks_name[KSTAT_STRLEN];
+	uint8_t		ks_type;
+	char		ks_class[KSTAT_STRLEN];
+	uint8_t		ks_flags;
+	caddr32_t	ks_data;		/* type-specific data */
+	uint32_t	ks_ndata;
+	size32_t	ks_data_size;
+	hrtime_t	ks_snaptime;
+	/*
+	 * Fields relevant to kernel only (only needed here for padding)
+	 */
+	int32_t		_ks_update;
+	caddr32_t	_ks_private;
+	int32_t		_ks_snapshot;
+	caddr32_t	_ks_lock;
+} kstat32_t;
+
+#endif	/* _SYSCALL32 */
 
 /*
  * kstat structure and locking strategy
@@ -350,9 +383,9 @@ typedef struct kstat {
  *
  *	ksp->ks_snaptime = gethrtime();
  *	if (rw == KSTAT_WRITE)
- *		memcpy(ksp->ks_data, buf, ksp->ks_data_size);
+ *		bcopy(buf, ksp->ks_data, ksp->ks_data_size);
  *	else
- *		memcpy(buf, ksp->ks_data, ksp->ks_data_size);
+ *		bcopy(ksp->ks_data, buf, ksp->ks_data_size);
  *	return (0);
  *
  * A more illuminating example is taking a snapshot of a linked list:
@@ -361,7 +394,7 @@ typedef struct kstat {
  *	if (rw == KSTAT_WRITE)
  *		return (EACCES);		... See below ...
  *	for (foo = first_foo; foo; foo = foo->next) {
- *		memcpy(buf, foo, sizeof (struct foo));
+ *		bcopy((char *) foo, (char *) buf, sizeof (struct foo));
  *		buf = ((struct foo *) buf) + 1;
  *	}
  *	return (0);
@@ -390,12 +423,12 @@ typedef struct kstat {
  * 	uint_t i;
  *
  * 	... Do the regular copy ...
- * 	memcpy(buf, ksp->ks_data, sizeof (kstat_named_t) * ksp->ks_ndata);
+ * 	bcopy(ksp->ks_data, buf, sizeof (kstat_named_t) * ksp->ks_ndata);
  *
  * 	for (i = 0; i < ksp->ks_ndata; i++, knp++) {
  *		if (knp[i].data_type == KSTAT_DATA_STRING &&
  *		    KSTAT_NAMED_STR_PTR(knp) != NULL) {
- *			memcpy(end, KSTAT_NAMED_STR_PTR(knp),
+ *			bcopy(KSTAT_NAMED_STR_PTR(knp), end,
  *			    KSTAT_NAMED_STR_BUFLEN(knp));
  *			KSTAT_NAMED_STR_PTR(knp) = end;
  *			end += KSTAT_NAMED_STR_BUFLEN(knp);
@@ -434,7 +467,7 @@ typedef struct kstat_named {
  * 64-bit compilation environments or 32-bit non-maximally conformant
  * C89 or C90 ANSI C compilation environments (cc -Xt and cc -Xa). In the
  * C99 ANSI C compilation environment, the long long type is supported.
- * The _INT64_TYPE is defined by the implementation (see sys/inttypes.h).
+ * The _INT64_TYPE is defined by the implementation (see sys/int_types.h).
  */
 #if defined(_INT64_TYPE)
 		int64_t		i64;

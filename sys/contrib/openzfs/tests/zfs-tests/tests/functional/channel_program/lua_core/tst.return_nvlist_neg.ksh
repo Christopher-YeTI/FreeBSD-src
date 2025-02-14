@@ -45,13 +45,17 @@ set -A args 'function() return 1 end' \
 typeset -i last_index=$((${#args[*]} - 1))
 for i in $(seq 0 $last_index); do
 	log_note "running program: ${args[i]}"
-	log_mustnot_checkerror_program "execution failed" $TESTPOOL - <<<"return ${args[i]}"
+	log_mustnot_checkerror_program "execution failed" $TESTPOOL - <<-EOF
+		return ${args[i]}
+	EOF
 	((i = i + 1))
 done
 
 for i in $(seq 0 $last_index); do
 	log_note "running program: ${args[i]}"
-	log_mustnot_checkerror_program "execution failed" $TESTPOOL - <<<"error(${args[i]})"
+	log_mustnot_checkerror_program "execution failed" $TESTPOOL - <<-EOF
+		error(${args[i]})
+	EOF
 	((i = i + 1))
 done
 

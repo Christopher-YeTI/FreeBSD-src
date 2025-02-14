@@ -36,6 +36,7 @@ hkdf_sha512_extract(uint8_t *salt, uint_t salt_len, uint8_t *key_material,
 	mech.cm_param_len = 0;
 
 	/* initialize the salt as a crypto key */
+	key.ck_format = CRYPTO_KEY_RAW;
 	key.ck_length = CRYPTO_BYTES2BITS(salt_len);
 	key.ck_data = salt;
 
@@ -52,7 +53,7 @@ hkdf_sha512_extract(uint8_t *salt, uint_t salt_len, uint8_t *key_material,
 	output_cd.cd_raw.iov_base = (char *)out_buf;
 	output_cd.cd_raw.iov_len = output_cd.cd_length;
 
-	ret = crypto_mac(&mech, &input_cd, &key, NULL, &output_cd);
+	ret = crypto_mac(&mech, &input_cd, &key, NULL, &output_cd, NULL);
 	if (ret != CRYPTO_SUCCESS)
 		return (SET_ERROR(EIO));
 
@@ -82,6 +83,7 @@ hkdf_sha512_expand(uint8_t *extract_key, uint8_t *info, uint_t info_len,
 	mech.cm_param_len = 0;
 
 	/* initialize the salt as a crypto key */
+	key.ck_format = CRYPTO_KEY_RAW;
 	key.ck_length = CRYPTO_BYTES2BITS(SHA512_DIGEST_LENGTH);
 	key.ck_data = extract_key;
 
@@ -108,19 +110,19 @@ hkdf_sha512_expand(uint8_t *extract_key, uint8_t *info, uint_t info_len,
 		T_cd.cd_length = T_len;
 		T_cd.cd_raw.iov_len = T_cd.cd_length;
 
-		ret = crypto_mac_init(&mech, &key, NULL, &ctx);
+		ret = crypto_mac_init(&mech, &key, NULL, &ctx, NULL);
 		if (ret != CRYPTO_SUCCESS)
 			return (SET_ERROR(EIO));
 
-		ret = crypto_mac_update(ctx, &T_cd);
+		ret = crypto_mac_update(ctx, &T_cd, NULL);
 		if (ret != CRYPTO_SUCCESS)
 			return (SET_ERROR(EIO));
 
-		ret = crypto_mac_update(ctx, &info_cd);
+		ret = crypto_mac_update(ctx, &info_cd, NULL);
 		if (ret != CRYPTO_SUCCESS)
 			return (SET_ERROR(EIO));
 
-		ret = crypto_mac_update(ctx, &c_cd);
+		ret = crypto_mac_update(ctx, &c_cd, NULL);
 		if (ret != CRYPTO_SUCCESS)
 			return (SET_ERROR(EIO));
 
@@ -128,11 +130,11 @@ hkdf_sha512_expand(uint8_t *extract_key, uint8_t *info, uint_t info_len,
 		T_cd.cd_length = T_len;
 		T_cd.cd_raw.iov_len = T_cd.cd_length;
 
-		ret = crypto_mac_final(ctx, &T_cd);
+		ret = crypto_mac_final(ctx, &T_cd, NULL);
 		if (ret != CRYPTO_SUCCESS)
 			return (SET_ERROR(EIO));
 
-		memcpy(out_buf + pos, T,
+		bcopy(T, out_buf + pos,
 		    (i != N) ? SHA512_DIGEST_LENGTH : (out_len - pos));
 		pos += SHA512_DIGEST_LENGTH;
 	}

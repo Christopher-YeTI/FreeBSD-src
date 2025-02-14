@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -48,7 +48,8 @@ verify_runnable "both"
 function cleanup
 {
 	for dataset in $all_datasets; do
-		snapexists ${dataset}@snap && destroy_dataset ${dataset}@snap
+		snapexists ${dataset}@snap && \
+			log_must zfs destroy ${dataset}@snap
 	done
 }
 
@@ -57,12 +58,22 @@ function verify_snapdir_visible # $1 dataset, $2 hidden|visible
 	typeset dataset=$1
 	typeset value=$2
 	typeset mtpt=$(get_prop mountpoint $dataset)
+	typeset name
 
-	# $mtpt/.zfs always actually exists so [ -d $mtpt/.zfs ] is always true
-	if ls -a $mtpt | grep -xFq .zfs; then
-		[ $value = "visible" ]
+	for name in `ls -a $mtpt`; do
+		if [[ $name == ".zfs" ]]; then
+			if [[ $value == "visible" ]]; then
+				return 0
+			else
+				return 1
+			fi
+		fi
+	done
+
+	if [[ $value == "visible" ]]; then
+		return 1
 	else
-		[ $value != "visible" ]
+		return 0
 	fi
 }
 
@@ -85,14 +96,15 @@ log_assert "Setting a valid snapdir property on a dataset succeeds."
 
 for dataset in $all_datasets; do
 	for value in hidden visible; do
-		if [ "$dataset" = "$TESTPOOL/$TESTVOL" ]; then
+		if [[ $dataset == "$TESTPOOL/$TESTVOL" ]] ; then
 			set_n_check_prop "$value" "snapdir" \
 				"$dataset" "false"
 		else
 			set_n_check_prop "$value" "snapdir" \
 				"$dataset"
-			verify_snapdir_visible $dataset $value ||
-				log_fail "$dataset/.zfs is not $value as expected."
+			verify_snapdir_visible $dataset $value
+			[[ $? -eq 0 ]] || \
+				log_fail "$dataset/.zfs is not $value as expect."
 		fi
 	done
 done

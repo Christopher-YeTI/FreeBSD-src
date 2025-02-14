@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -40,20 +40,26 @@
  * DTRACE_PROBE1(...,
  *     taskq_ent_t *, ...);
  */
+/* BEGIN CSTYLED */
 DECLARE_EVENT_CLASS(zfs_taskq_ent_class,
-    TP_PROTO(taskq_ent_t *taskq_ent),
-    TP_ARGS(taskq_ent),
-    TP_STRUCT__entry(__field(taskq_ent_t *, taskq_ent)),
-    TP_fast_assign(
-	__entry->taskq_ent = taskq_ent;
-),
-    TP_printk("taskq_ent %p", __entry->taskq_ent)
+	TP_PROTO(taskq_ent_t *taskq_ent),
+	TP_ARGS(taskq_ent),
+	TP_STRUCT__entry(
+	    __field(taskq_ent_t *,	taskq_ent)
+	),
+	TP_fast_assign(
+	    __entry->taskq_ent	= taskq_ent;
+	),
+	TP_printk("taskq_ent %p", __entry->taskq_ent)
 );
+/* END CSTYLED */
 
-#define	DEFINE_TASKQ_EVENT(name) \
+/* BEGIN CSTYLED */
+#define DEFINE_TASKQ_EVENT(name) \
 DEFINE_EVENT(zfs_taskq_ent_class, name, \
-    TP_PROTO(taskq_ent_t *taskq_ent), \
-    TP_ARGS(taskq_ent))
+	TP_PROTO(taskq_ent_t *taskq_ent), \
+	TP_ARGS(taskq_ent))
+/* END CSTYLED */
 DEFINE_TASKQ_EVENT(zfs_taskq_ent__birth);
 DEFINE_TASKQ_EVENT(zfs_taskq_ent__start);
 DEFINE_TASKQ_EVENT(zfs_taskq_ent__finish);

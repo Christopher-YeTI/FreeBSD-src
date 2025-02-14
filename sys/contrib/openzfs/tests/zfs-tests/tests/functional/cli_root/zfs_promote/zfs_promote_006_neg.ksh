@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -62,9 +62,13 @@ set -A args "" \
 
 function cleanup
 {
-	datasetexists $clone && destroy_dataset $clone
+	if datasetexists $clone; then
+		log_must zfs destroy $clone
+	fi
 
-	datasetexists $recvfs && destroy_dataset $recvfs -r
+	if datasetexists $recvfs; then
+		log_must zfs destroy -r $recvfs
+	fi
 
 	if snapexists $snap; then
 		destroy_snapshot  $snap

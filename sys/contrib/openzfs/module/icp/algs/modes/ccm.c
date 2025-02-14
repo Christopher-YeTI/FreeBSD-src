@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or https://opensource.org/licenses/CDDL-1.0.
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -59,14 +59,15 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 
 	if (length + ctx->ccm_remainder_len < block_size) {
 		/* accumulate bytes here and return */
-		memcpy((uint8_t *)ctx->ccm_remainder + ctx->ccm_remainder_len,
-		    datap,
+		bcopy(datap,
+		    (uint8_t *)ctx->ccm_remainder + ctx->ccm_remainder_len,
 		    length);
 		ctx->ccm_remainder_len += length;
 		ctx->ccm_copy_to = datap;
 		return (CRYPTO_SUCCESS);
 	}
 
+	lastp = (uint8_t *)ctx->ccm_cb;
 	crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	mac_buf = (uint8_t *)ctx->ccm_mac_buf;
@@ -79,8 +80,8 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 			if (need > remainder)
 				return (CRYPTO_DATA_LEN_RANGE);
 
-			memcpy(&((uint8_t *)ctx->ccm_remainder)
-			    [ctx->ccm_remainder_len], datap, need);
+			bcopy(datap, &((uint8_t *)ctx->ccm_remainder)
+			    [ctx->ccm_remainder_len], need);
 
 			blockp = (uint8_t *)ctx->ccm_remainder;
 		} else {
@@ -131,10 +132,10 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		if (out_data_1_len == block_size) {
 			copy_block(lastp, out_data_1);
 		} else {
-			memcpy(out_data_1, lastp, out_data_1_len);
+			bcopy(lastp, out_data_1, out_data_1_len);
 			if (out_data_2 != NULL) {
-				memcpy(out_data_2,
-				    lastp + out_data_1_len,
+				bcopy(lastp + out_data_1_len,
+				    out_data_2,
 				    block_size - out_data_1_len);
 			}
 		}
@@ -153,7 +154,7 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 
 		/* Incomplete last block. */
 		if (remainder > 0 && remainder < block_size) {
-			memcpy(ctx->ccm_remainder, datap, remainder);
+			bcopy(datap, ctx->ccm_remainder, remainder);
 			ctx->ccm_remainder_len = remainder;
 			ctx->ccm_copy_to = datap;
 			goto out;
@@ -189,6 +190,7 @@ calculate_ccm_mac(ccm_ctx_t *ctx, uint8_t *ccm_mac,
 	}
 }
 
+/* ARGSUSED */
 int
 ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
@@ -223,10 +225,10 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 
 		/* ccm_mac_input_buf is not used for encryption */
 		macp = (uint8_t *)ctx->ccm_mac_input_buf;
-		memset(macp, 0, block_size);
+		bzero(macp, block_size);
 
 		/* copy remainder to temporary buffer */
-		memcpy(macp, ctx->ccm_remainder, ctx->ccm_remainder_len);
+		bcopy(ctx->ccm_remainder, macp, ctx->ccm_remainder_len);
 
 		/* calculate the CBC MAC */
 		xor_block(macp, mac_buf);
@@ -253,32 +255,33 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	    ctx->ccm_remainder_len + ctx->ccm_mac_len);
 
 	if (ctx->ccm_remainder_len > 0) {
+
 		/* copy temporary block to where it belongs */
 		if (out_data_2 == NULL) {
 			/* everything will fit in out_data_1 */
-			memcpy(out_data_1, macp, ctx->ccm_remainder_len);
-			memcpy(out_data_1 + ctx->ccm_remainder_len, ccm_mac_p,
+			bcopy(macp, out_data_1, ctx->ccm_remainder_len);
+			bcopy(ccm_mac_p, out_data_1 + ctx->ccm_remainder_len,
 			    ctx->ccm_mac_len);
 		} else {
+
 			if (out_data_1_len < ctx->ccm_remainder_len) {
+
 				size_t data_2_len_used;
 
-				memcpy(out_data_1, macp, out_data_1_len);
+				bcopy(macp, out_data_1, out_data_1_len);
 
 				data_2_len_used = ctx->ccm_remainder_len
 				    - out_data_1_len;
 
-				memcpy(out_data_2,
-				    (uint8_t *)macp + out_data_1_len,
-				    data_2_len_used);
-				memcpy(out_data_2 + data_2_len_used,
-				    ccm_mac_p,
+				bcopy((uint8_t *)macp + out_data_1_len,
+				    out_data_2, data_2_len_used);
+				bcopy(ccm_mac_p, out_data_2 + data_2_len_used,
 				    ctx->ccm_mac_len);
 			} else {
-				memcpy(out_data_1, macp, out_data_1_len);
+				bcopy(macp, out_data_1, out_data_1_len);
 				if (out_data_1_len == ctx->ccm_remainder_len) {
 					/* mac will be in out_data_2 */
-					memcpy(out_data_2, ccm_mac_p,
+					bcopy(ccm_mac_p, out_data_2,
 					    ctx->ccm_mac_len);
 				} else {
 					size_t len_not_used = out_data_1_len -
@@ -288,11 +291,11 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 					 * out_data_1, part of the mac will be
 					 * in out_data_2
 					 */
-					memcpy(out_data_1 +
-					    ctx->ccm_remainder_len,
-					    ccm_mac_p, len_not_used);
-					memcpy(out_data_2,
-					    ccm_mac_p + len_not_used,
+					bcopy(ccm_mac_p,
+					    out_data_1 + ctx->ccm_remainder_len,
+					    len_not_used);
+					bcopy(ccm_mac_p + len_not_used,
+					    out_data_2,
 					    ctx->ccm_mac_len - len_not_used);
 
 				}
@@ -300,9 +303,9 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		}
 	} else {
 		/* copy block to where it belongs */
-		memcpy(out_data_1, ccm_mac_p, out_data_1_len);
+		bcopy(ccm_mac_p, out_data_1, out_data_1_len);
 		if (out_data_2 != NULL) {
-			memcpy(out_data_2, ccm_mac_p + out_data_1_len,
+			bcopy(ccm_mac_p + out_data_1_len, out_data_2,
 			    block_size - out_data_1_len);
 		}
 	}
@@ -339,6 +342,7 @@ ccm_decrypt_incomplete_block(ccm_ctx_t *ctx,
  * returned to the caller.  It will be returned when decrypt_final() is
  * called if the MAC matches
  */
+/* ARGSUSED */
 int
 ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
     crypto_data_t *out, size_t block_size,
@@ -346,7 +350,6 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
     void (*copy_block)(uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *))
 {
-	(void) out;
 	size_t remainder = length;
 	size_t need = 0;
 	uint8_t *datap = (uint8_t *)data;
@@ -370,7 +373,7 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		}
 		tmp = (uint8_t *)ctx->ccm_mac_input_buf;
 
-		memcpy(tmp + pm_len, datap, length);
+		bcopy(datap, tmp + pm_len, length);
 
 		ctx->ccm_processed_mac_len += length;
 		return (CRYPTO_SUCCESS);
@@ -403,15 +406,15 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		mac_len = length - pt_part;
 
 		ctx->ccm_processed_mac_len = mac_len;
-		memcpy(ctx->ccm_mac_input_buf, data + pt_part, mac_len);
+		bcopy(data + pt_part, ctx->ccm_mac_input_buf, mac_len);
 
 		if (pt_part + ctx->ccm_remainder_len < block_size) {
 			/*
 			 * since this is last of the ciphertext, will
 			 * just decrypt with it here
 			 */
-			memcpy(&((uint8_t *)ctx->ccm_remainder)
-			    [ctx->ccm_remainder_len], datap, pt_part);
+			bcopy(datap, &((uint8_t *)ctx->ccm_remainder)
+			    [ctx->ccm_remainder_len], pt_part);
 			ctx->ccm_remainder_len += pt_part;
 			ccm_decrypt_incomplete_block(ctx, encrypt_block);
 			ctx->ccm_processed_data_len += ctx->ccm_remainder_len;
@@ -422,9 +425,9 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 			length = pt_part;
 		}
 	} else if (length + ctx->ccm_remainder_len < block_size) {
-		/* accumulate bytes here and return */
-		memcpy((uint8_t *)ctx->ccm_remainder + ctx->ccm_remainder_len,
-		    datap,
+			/* accumulate bytes here and return */
+		bcopy(datap,
+		    (uint8_t *)ctx->ccm_remainder + ctx->ccm_remainder_len,
 		    length);
 		ctx->ccm_remainder_len += length;
 		ctx->ccm_copy_to = datap;
@@ -439,8 +442,8 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 			if (need > remainder)
 				return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
 
-			memcpy(&((uint8_t *)ctx->ccm_remainder)
-			    [ctx->ccm_remainder_len], datap, need);
+			bcopy(datap, &((uint8_t *)ctx->ccm_remainder)
+			    [ctx->ccm_remainder_len], need);
 
 			blockp = (uint8_t *)ctx->ccm_remainder;
 		} else {
@@ -490,7 +493,7 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 
 		/* Incomplete last block */
 		if (remainder > 0 && remainder < block_size) {
-			memcpy(ctx->ccm_remainder, datap, remainder);
+			bcopy(datap, ctx->ccm_remainder, remainder);
 			ctx->ccm_remainder_len = remainder;
 			ctx->ccm_copy_to = datap;
 			if (ctx->ccm_processed_mac_len > 0) {
@@ -537,9 +540,10 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	macp = (uint8_t *)ctx->ccm_tmp;
 
 	while (mac_remain > 0) {
+
 		if (mac_remain < block_size) {
-			memset(macp, 0, block_size);
-			memcpy(macp, pt, mac_remain);
+			bzero(macp, block_size);
+			bcopy(pt, macp, mac_remain);
 			mac_remain = 0;
 		} else {
 			copy_block(pt, macp);
@@ -557,7 +561,7 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 	calculate_ccm_mac((ccm_ctx_t *)ctx, ccm_mac_p, encrypt_block);
 
 	/* compare the input CCM MAC value with what we calculated */
-	if (memcmp(ctx->ccm_mac_input_buf, ccm_mac_p, ctx->ccm_mac_len)) {
+	if (bcmp(ctx->ccm_mac_input_buf, ccm_mac_p, ctx->ccm_mac_len)) {
 		/* They don't match */
 		return (CRYPTO_INVALID_MAC);
 	} else {
@@ -651,13 +655,13 @@ ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 	b0[0] = (have_adata << 6) | (((t - 2)  / 2) << 3) | (q - 1);
 
 	/* copy the nonce value into b0 */
-	memcpy(&(b0[1]), nonce, nonceSize);
+	bcopy(nonce, &(b0[1]), nonceSize);
 
 	/* store the length of the payload into b0 */
-	memset(&(b0[1+nonceSize]), 0, q);
+	bzero(&(b0[1+nonceSize]), q);
 
 	payloadSize = aes_ctx->ccm_data_len;
-	limit = MIN(8, q);
+	limit = 8 < q ? 8 : q;
 
 	for (i = 0, j = 0, k = 15; i < limit; i++, j += 8, k--) {
 		b0[k] = (uint8_t)((payloadSize >> j) & 0xFF);
@@ -670,9 +674,9 @@ ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 	cb[0] = 0x07 & (q-1); /* first byte */
 
 	/* copy the nonce value into the counter block */
-	memcpy(&(cb[1]), nonce, nonceSize);
+	bcopy(nonce, &(cb[1]), nonceSize);
 
-	memset(&(cb[1+nonceSize]), 0, q);
+	bzero(&(cb[1+nonceSize]), q);
 
 	/* Create the mask for the counter field based on the size of nonce */
 	q <<= 3;
@@ -779,7 +783,7 @@ ccm_init(ccm_ctx_t *ctx, unsigned char *nonce, size_t nonce_len,
 
 	/* The IV for CBC MAC for AES CCM mode is always zero */
 	ivp = (uint8_t *)ctx->ccm_tmp;
-	memset(ivp, 0, block_size);
+	bzero(ivp, block_size);
 
 	xor_block(ivp, mac_buf);
 
@@ -797,14 +801,14 @@ ccm_init(ccm_ctx_t *ctx, unsigned char *nonce, size_t nonce_len,
 
 	/* 1st block: it contains encoded associated data, and some data */
 	authp = (uint8_t *)ctx->ccm_tmp;
-	memset(authp, 0, block_size);
-	memcpy(authp, encoded_a, encoded_a_len);
+	bzero(authp, block_size);
+	bcopy(encoded_a, authp, encoded_a_len);
 	processed = block_size - encoded_a_len;
 	if (processed > auth_data_len) {
 		/* in case auth_data is very small */
 		processed = auth_data_len;
 	}
-	memcpy(authp+encoded_a_len, auth_data, processed);
+	bcopy(auth_data, authp+encoded_a_len, processed);
 	/* xor with previous buffer */
 	xor_block(authp, mac_buf);
 	encrypt_block(ctx->ccm_keysched, mac_buf, mac_buf);
@@ -820,8 +824,8 @@ ccm_init(ccm_ctx_t *ctx, unsigned char *nonce, size_t nonce_len,
 			 * There's not a block full of data, pad rest of
 			 * buffer with zero
 			 */
-			memset(authp, 0, block_size);
-			memcpy(authp, &(auth_data[processed]), remainder);
+			bzero(authp, block_size);
+			bcopy(&(auth_data[processed]), authp, remainder);
 			datap = (uint8_t *)authp;
 			remainder = 0;
 		} else {

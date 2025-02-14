@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -89,7 +89,7 @@ function cleanup_all
 
 	while (( i < ${#args[*]} )); do
 		for snap in ${args[i]}; do
-			snapexists $snap && destroy_dataset $snap -f
+			snapexists $snap && log_must zfs destroy -f $snap
 		done
 		(( i = i + 1 ))
 	done

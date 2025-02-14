@@ -47,26 +47,15 @@
 #if defined(__x86_64__) && defined(HAVE_AVX) && \
     defined(HAVE_AES) && defined(HAVE_PCLMULQDQ)
 
-#define _ASM
-#include <sys/asm_linkage.h>
-
-/* Windows userland links with OpenSSL */
-#if !defined (_WIN32) || defined (_KERNEL)
-
-/* Apple needs _ */
-#if defined (__APPLE__)
-#define	gcm_avx_can_use_movbe _gcm_avx_can_use_movbe
-#endif
-
 .extern gcm_avx_can_use_movbe
 
 .text
 
 #ifdef HAVE_MOVBE
-.balign 32
-FUNCTION(_aesni_ctr32_ghash_6x)
+.type	_aesni_ctr32_ghash_6x,@function
+.align	32
+_aesni_ctr32_ghash_6x:
 .cfi_startproc
-	ENDBR
 	vmovdqu	32(%r11),%xmm2
 	subq	$6,%rdx
 	vpxor	%xmm4,%xmm4,%xmm4
@@ -80,7 +69,7 @@ FUNCTION(_aesni_ctr32_ghash_6x)
 	vmovdqu	%xmm4,16+8(%rsp)
 	jmp	.Loop6x
 
-.balign	32
+.align	32
 .Loop6x:
 	addl	$100663296,%ebx
 	jc	.Lhandle_ctr32
@@ -292,7 +281,7 @@ FUNCTION(_aesni_ctr32_ghash_6x)
 	vmovups	224-128(%rcx),%xmm1
 	jmp	.Lenc_tail
 
-.balign	32
+.align	32
 .Lhandle_ctr32:
 	vmovdqu	(%r11),%xmm0
 	vpshufb	%xmm0,%xmm1,%xmm6
@@ -314,7 +303,7 @@ FUNCTION(_aesni_ctr32_ghash_6x)
 	vpshufb	%xmm0,%xmm1,%xmm1
 	jmp	.Lresume_ctr32
 
-.balign	32
+.align	32
 .Lenc_tail:
 	vaesenc	%xmm15,%xmm9,%xmm9
 	vmovdqu	%xmm7,16+8(%rsp)
@@ -374,15 +363,15 @@ FUNCTION(_aesni_ctr32_ghash_6x)
 	vpxor	16+8(%rsp),%xmm8,%xmm8
 	vpxor	%xmm4,%xmm8,%xmm8
 
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(_aesni_ctr32_ghash_6x)
+.size	_aesni_ctr32_ghash_6x,.-_aesni_ctr32_ghash_6x
 #endif /* ifdef HAVE_MOVBE */
 
-.balign 32
-FUNCTION(_aesni_ctr32_ghash_no_movbe_6x)
+.type	_aesni_ctr32_ghash_no_movbe_6x,@function
+.align	32
+_aesni_ctr32_ghash_no_movbe_6x:
 .cfi_startproc
-	ENDBR
 	vmovdqu	32(%r11),%xmm2
 	subq	$6,%rdx
 	vpxor	%xmm4,%xmm4,%xmm4
@@ -396,7 +385,7 @@ FUNCTION(_aesni_ctr32_ghash_no_movbe_6x)
 	vmovdqu	%xmm4,16+8(%rsp)
 	jmp	.Loop6x_nmb
 
-.balign	32
+.align	32
 .Loop6x_nmb:
 	addl	$100663296,%ebx
 	jc	.Lhandle_ctr32_nmb
@@ -620,7 +609,7 @@ FUNCTION(_aesni_ctr32_ghash_no_movbe_6x)
 	vmovups	224-128(%rcx),%xmm1
 	jmp	.Lenc_tail_nmb
 
-.balign	32
+.align	32
 .Lhandle_ctr32_nmb:
 	vmovdqu	(%r11),%xmm0
 	vpshufb	%xmm0,%xmm1,%xmm6
@@ -642,7 +631,7 @@ FUNCTION(_aesni_ctr32_ghash_no_movbe_6x)
 	vpshufb	%xmm0,%xmm1,%xmm1
 	jmp	.Lresume_ctr32_nmb
 
-.balign	32
+.align	32
 .Lenc_tail_nmb:
 	vaesenc	%xmm15,%xmm9,%xmm9
 	vmovdqu	%xmm7,16+8(%rsp)
@@ -702,13 +691,15 @@ FUNCTION(_aesni_ctr32_ghash_no_movbe_6x)
 	vpxor	16+8(%rsp),%xmm8,%xmm8
 	vpxor	%xmm4,%xmm8,%xmm8
 
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(_aesni_ctr32_ghash_no_movbe_6x)
+.size	_aesni_ctr32_ghash_no_movbe_6x,.-_aesni_ctr32_ghash_no_movbe_6x
 
-ENTRY_ALIGN(aesni_gcm_decrypt, 32)
+.globl	aesni_gcm_decrypt
+.type	aesni_gcm_decrypt,@function
+.align	32
+aesni_gcm_decrypt:
 .cfi_startproc
-	ENDBR
 	xorq	%r10,%r10
 	cmpq	$0x60,%rdx
 	jb	.Lgcm_dec_abort
@@ -819,14 +810,13 @@ ENTRY_ALIGN(aesni_gcm_decrypt, 32)
 .cfi_def_cfa_register	%rsp
 .Lgcm_dec_abort:
 	movq	%r10,%rax
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(aesni_gcm_decrypt)
-
-.balign 32
-FUNCTION(_aesni_ctr32_6x)
+.size	aesni_gcm_decrypt,.-aesni_gcm_decrypt
+.type	_aesni_ctr32_6x,@function
+.align	32
+_aesni_ctr32_6x:
 .cfi_startproc
-	ENDBR
 	vmovdqu	0-128(%rcx),%xmm4
 	vmovdqu	32(%r11),%xmm2
 	leaq	-2(%rbp),%r13	// ICP uses 10,12,14 not 9,11,13 for rounds.
@@ -848,7 +838,7 @@ FUNCTION(_aesni_ctr32_6x)
 	vpxor	%xmm4,%xmm14,%xmm14
 	jmp	.Loop_ctr32
 
-.balign	16
+.align	16
 .Loop_ctr32:
 	vaesenc	%xmm15,%xmm9,%xmm9
 	vaesenc	%xmm15,%xmm10,%xmm10
@@ -890,8 +880,8 @@ FUNCTION(_aesni_ctr32_6x)
 	vmovups	%xmm14,80(%rsi)
 	leaq	96(%rsi),%rsi
 
-	RET
-.balign	32
+	.byte	0xf3,0xc3
+.align	32
 .Lhandle_ctr32_2:
 	vpshufb	%xmm0,%xmm1,%xmm6
 	vmovdqu	48(%r11),%xmm5
@@ -914,11 +904,13 @@ FUNCTION(_aesni_ctr32_6x)
 	vpxor	%xmm4,%xmm14,%xmm14
 	jmp	.Loop_ctr32
 .cfi_endproc
-SET_SIZE(_aesni_ctr32_6x)
+.size	_aesni_ctr32_6x,.-_aesni_ctr32_6x
 
-ENTRY_ALIGN(aesni_gcm_encrypt, 32)
+.globl	aesni_gcm_encrypt
+.type	aesni_gcm_encrypt,@function
+.align	32
+aesni_gcm_encrypt:
 .cfi_startproc
-	ENDBR
 	xorq	%r10,%r10
 	cmpq	$288,%rdx
 	jb	.Lgcm_enc_abort
@@ -1194,11 +1186,9 @@ ENTRY_ALIGN(aesni_gcm_encrypt, 32)
 .cfi_def_cfa_register	%rsp
 .Lgcm_enc_abort:
 	movq	%r10,%rax
-	RET
+	.byte	0xf3,0xc3
 .cfi_endproc
-SET_SIZE(aesni_gcm_encrypt)
-
-#endif /* !_WIN32 || _KERNEL */
+.size	aesni_gcm_encrypt,.-aesni_gcm_encrypt
 
 /* Some utility routines */
 
@@ -1206,10 +1196,13 @@ SET_SIZE(aesni_gcm_encrypt)
  * clear all fpu registers
  * void clear_fpu_regs_avx(void);
  */
-ENTRY_ALIGN(clear_fpu_regs_avx, 32)
+.globl	clear_fpu_regs_avx
+.type	clear_fpu_regs_avx,@function
+.align	32
+clear_fpu_regs_avx:
 	vzeroall
-	RET
-SET_SIZE(clear_fpu_regs_avx)
+	ret
+.size	clear_fpu_regs_avx,.-clear_fpu_regs_avx
 
 /*
  * void gcm_xor_avx(const uint8_t *src, uint8_t *dst);
@@ -1218,31 +1211,35 @@ SET_SIZE(clear_fpu_regs_avx)
  * stores the result at `dst'. The XOR is performed using FPU registers,
  * so make sure FPU state is saved when running this in the kernel.
  */
-ENTRY_ALIGN(gcm_xor_avx, 32)
+.globl  gcm_xor_avx
+.type	gcm_xor_avx,@function
+.align	32
+gcm_xor_avx:
 	movdqu  (%rdi), %xmm0
 	movdqu  (%rsi), %xmm1
 	pxor    %xmm1, %xmm0
 	movdqu  %xmm0, (%rsi)
-	RET
-SET_SIZE(gcm_xor_avx)
+	ret
+.size	gcm_xor_avx,.-gcm_xor_avx
 
 /*
  * Toggle a boolean_t value atomically and return the new value.
  * boolean_t atomic_toggle_boolean_nv(volatile boolean_t *);
  */
-ENTRY_ALIGN(atomic_toggle_boolean_nv, 32)
+.globl	atomic_toggle_boolean_nv
+.type	atomic_toggle_boolean_nv,@function
+.align	32
+atomic_toggle_boolean_nv:
 	xorl	%eax, %eax
 	lock
 	xorl	$1, (%rdi)
 	jz	1f
 	movl	$1, %eax
 1:
-	RET
-SET_SIZE(atomic_toggle_boolean_nv)
+	ret
+.size	atomic_toggle_boolean_nv,.-atomic_toggle_boolean_nv
 
-SECTION_STATIC
-
-.balign	64
+.align	64
 .Lbswap_mask:
 .byte	15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
 .Lpoly:
@@ -1254,7 +1251,7 @@ SECTION_STATIC
 .Lone_lsb:
 .byte	1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 .byte	65,69,83,45,78,73,32,71,67,77,32,109,111,100,117,108,101,32,102,111,114,32,120,56,54,95,54,52,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
-.balign	64
+.align	64
 
 /* Mark the stack non-executable. */
 #if defined(__linux__) && defined(__ELF__)

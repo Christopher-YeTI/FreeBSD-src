@@ -1,1 +1,1 @@
-dist_noinst_DATA += %D%/autosnap.lua
+EXTRA_DIST = autosnap.lua

@@ -7,7 +7,7 @@
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or https://opensource.org/licenses/CDDL-1.0.
+# or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -109,8 +109,10 @@ while ((i < ${#args[@]})); do
 		
 		msg=$(mount | grep "$tmpmnt ")
 
-		if ! echo $msg | grep -q "${args[((i))]}"; then
-			if echo $msg | grep -q "${args[((i-1))]}"; then
+		echo $msg | grep "${args[((i))]}" > /dev/null 2>&1
+		if (($? != 0)) ; then
+			echo $msg | grep "${args[((i-1))]}" > /dev/null 2>&1
+			if (($? == 0)) ; then
 				log_fail "Expected option: ${args[((i))]} \n" \
 					 "Real option: $msg"
 			fi
@@ -128,7 +130,8 @@ while ((i < ${#args[@]})); do
 			args[((i+1))]="/nodevices/"
 		fi
 
-		if ! echo $msg | grep -q "${args[((i+1))]}"; then
+		echo $msg | grep "${args[((i+1))]}" > /dev/null 2>&1
+		if (($? != 0)) ; then
 			log_fail "Expected option: ${args[((i+1))]} \n" \
 				 "Real option: $msg"
 		fi

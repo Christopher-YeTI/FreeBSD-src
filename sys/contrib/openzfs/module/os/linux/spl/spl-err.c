@@ -32,9 +32,11 @@
  * analysis and other such goodies.
  * But we would still default to the current default of not to do that.
  */
-static unsigned int spl_panic_halt;
+/* BEGIN CSTYLED */
+unsigned int spl_panic_halt;
 module_param(spl_panic_halt, uint, 0644);
 MODULE_PARM_DESC(spl_panic_halt, "Cause kernel panic on assertion failures");
+/* END CSTYLED */
 
 void
 spl_dumpstack(void)
@@ -44,7 +46,7 @@ spl_dumpstack(void)
 }
 EXPORT_SYMBOL(spl_dumpstack);
 
-void
+int
 spl_panic(const char *file, const char *func, int line, const char *fmt, ...)
 {
 	const char *newfile;
@@ -74,6 +76,7 @@ spl_panic(const char *file, const char *func, int line, const char *fmt, ...)
 		schedule();
 
 	/* Unreachable */
+	return (1);
 }
 EXPORT_SYMBOL(spl_panic);
 
@@ -98,9 +101,6 @@ vcmn_err(int ce, const char *fmt, va_list ap)
 		break;
 	case CE_PANIC:
 		printk(KERN_EMERG "PANIC: %s\n", msg);
-		if (spl_panic_halt)
-			panic("%s", msg);
-
 		spl_dumpstack();
 
 		/* Halt the thread to facilitate further debugging */
