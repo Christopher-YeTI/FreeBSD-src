@@ -36,6 +36,10 @@
  * Copyright [2021] Hewlett Packard Enterprise Development LP
  */
 
+#define _LIBC_LIMITS  /* Garante que os limites da biblioteca sejam respeitados */
+#define LIBINTL   /* Força o uso da biblioteca libintl */
+#include <libintl.h>  /* Garante que a biblioteca de tradução será usada */
+
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -43,7 +47,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
-#include <libintl.h>
+
 #include <libuutil.h>
 #include <locale.h>
 #include <pthread.h>

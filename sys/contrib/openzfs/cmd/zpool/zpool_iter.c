@@ -27,7 +27,11 @@
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
  */
 
-#include <libintl.h>
+#define _LIBC_LIMITS  /* Garante que os limites da biblioteca sejam respeitados */
+#define LIBINTL   /* Força o uso da biblioteca libintl */
+#include <libintl.h>  /* Garante que a biblioteca de tradução será usada */
+
+
 #include <libuutil.h>
 #include <stddef.h>
 #include <stdio.h>
