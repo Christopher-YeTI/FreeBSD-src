@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -40,8 +40,8 @@
 
 static taskq_t *vdev_file_taskq;
 
-unsigned long vdev_file_logical_ashift = SPA_MINBLOCKSHIFT;
-unsigned long vdev_file_physical_ashift = SPA_MINBLOCKSHIFT;
+static uint_t vdev_file_logical_ashift = SPA_MINBLOCKSHIFT;
+static uint_t vdev_file_physical_ashift = SPA_MINBLOCKSHIFT;
 
 void
 vdev_file_init(void)
@@ -59,13 +59,13 @@ vdev_file_fini(void)
 static void
 vdev_file_hold(vdev_t *vd)
 {
-	ASSERT(vd->vdev_path != NULL);
+	ASSERT3P(vd->vdev_path, !=, NULL);
 }
 
 static void
 vdev_file_rele(vdev_t *vd)
 {
-	ASSERT(vd->vdev_path != NULL);
+	ASSERT3P(vd->vdev_path, !=, NULL);
 }
 
 static mode_t
@@ -137,7 +137,8 @@ vdev_file_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	 * administrator has already decided that the pool should be available
 	 * to local zone users, so the underlying devices should be as well.
 	 */
-	ASSERT(vd->vdev_path != NULL && vd->vdev_path[0] == '/');
+	ASSERT3P(vd->vdev_path, !=, NULL);
+	ASSERT(vd->vdev_path[0] == '/');
 
 	error = zfs_file_open(vd->vdev_path,
 	    vdev_file_open_mode(spa_mode(vd->vdev_spa)), 0, &fp);
@@ -233,6 +234,7 @@ vdev_file_io_strategy(void *arg)
 		err = zfs_file_pwrite(vf->vf_file, buf, size, off, &resid);
 		abd_return_buf(zio->io_abd, buf, size);
 	}
+	zio->io_error = err;
 	if (resid != 0 && zio->io_error == 0)
 		zio->io_error = ENOSPC;
 
@@ -285,10 +287,10 @@ vdev_file_io_start(zio_t *zio)
 	    TQ_SLEEP), !=, 0);
 }
 
-/* ARGSUSED */
 static void
 vdev_file_io_done(zio_t *zio)
 {
+	(void) zio;
 }
 
 vdev_ops_t vdev_file_ops = {
@@ -348,7 +350,7 @@ vdev_ops_t vdev_disk_ops = {
 
 #endif
 
-ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, logical_ashift, ULONG, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, logical_ashift, UINT, ZMOD_RW,
 	"Logical ashift for file-based devices");
-ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, physical_ashift, ULONG, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs_vdev_file, vdev_file_, physical_ashift, UINT, ZMOD_RW,
 	"Physical ashift for file-based devices");
