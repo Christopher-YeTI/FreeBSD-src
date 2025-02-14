@@ -33,7 +33,9 @@
  * Copyright (c) 2019, 2020 by Christian Schwarz. All rights reserved.
  */
 
-
+#define _LIBC_LIMITS  /* Garante que os limites da biblioteca sejam respeitados */
+#define LIBINTL   /* Força o uso da biblioteca libintl */
+#include <libintl.h>  /* Garante que a biblioteca de tradução será usada */
 
 #include <assert.h>
 #include <ctype.h>
@@ -41,7 +43,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <libgen.h>
-#include <libintl.h>
+
 #include <libuutil.h>
 #include <libnvpair.h>
 #include <locale.h>
