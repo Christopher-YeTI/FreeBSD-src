@@ -33,6 +33,10 @@
  * Copyright (c) 2019, 2020 by Christian Schwarz. All rights reserved.
  */
 
+LDFLAGS+= -L/usr/local/lib -lintl
+LDLIBS+= -lintl
+CFLAGS+= -I/usr/local/include
+
 #include <assert.h>
 #include <ctype.h>
 #include <sys/debug.h>
