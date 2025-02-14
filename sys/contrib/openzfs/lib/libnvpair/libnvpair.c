@@ -22,6 +22,7 @@
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
+#define TEXT_DOMAIN "libnvpair"
 
 #include <unistd.h>
 #include <string.h>
@@ -383,7 +384,7 @@ nvlist_prtctl_setfmt(nvlist_prtctl_t pctl, enum nvlist_prtctl_fmt which,
 			pctl->nvprt_btwnarrfmt_nl = 0;
 		} else {
 			pctl->nvprt_btwnarrfmt = fmt;
-			pctl->nvprt_btwnarrfmt_nl = (strstr(fmt, "\n") != NULL);
+			pctl->nvprt_btwnarrfmt_nl = (strchr(fmt, '\n') != NULL);
 		}
 		break;
 

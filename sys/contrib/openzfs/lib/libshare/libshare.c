@@ -39,6 +39,8 @@
 #include <libshare.h>
 #include "libshare_impl.h"
 
+#define TEXT_DOMAIN "zfs"
+
 #define	init_share(zfsname, path, shareopts) \
 	{ \
 		.sa_zfsname = zfsname, \
