@@ -1,6 +1,8 @@
 LDFLAGS+= -L/usr/local/lib -lintl
 LDLIBS+= -lintl
 CFLAGS+= -I/usr/local/include
+LDFLAGS += -Wl,--allow-shlib-undefined
+
 
 sbin_PROGRAMS   += zfs
 CPPCHECKTARGETS += zfs
