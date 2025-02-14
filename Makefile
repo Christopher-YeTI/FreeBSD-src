@@ -1,3 +1,8 @@
+LDFLAGS+= -L/usr/local/lib -lintl
+LDLIBS+= -lintl
+CFLAGS+= -I/usr/local/include
+
+
 #
 #
 # The common user-driven targets are (for a complete list, see build(7)):

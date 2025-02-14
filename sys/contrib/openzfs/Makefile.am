@@ -1,3 +1,7 @@
+LDFLAGS+= -L/usr/local/lib -lintl
+LDLIBS+= -lintl
+CFLAGS+= -I/usr/local/include
+
 CLEANFILES =
 dist_noinst_DATA =
 INSTALL_DATA_HOOKS =
