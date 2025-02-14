@@ -1827,9 +1827,7 @@ template <class ELFT> void Writer<ELFT>::finalizeSections() {
         for (Symbol *sym : file->requiredSymbols) {
           if (sym->dsoDefined)
             continue;
-          if (sym->isUndefined()) {
-            
-          } else if (sym->isDefined() && sym->computeBinding() == STB_LOCAL) {
+          if (sym->isDefined() && sym->computeBinding() == STB_LOCAL) {
             diagnose("non-exported symbol '" + toString(*sym) + "' in '" +
                      toString(sym->file) + "' is referenced by DSO '" +
                      toString(file) + "'");
