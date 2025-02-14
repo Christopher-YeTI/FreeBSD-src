@@ -23,7 +23,10 @@
  * Copyright (c) 2017, Intle Corporation. All rights reserved.
  */
 
-
+#define _LIBC_LIMITS  /* Garante que os limites da biblioteca sejam respeitados */
+#define LIBINTL   /* Força o uso da biblioteca libintl */
+#include <libintl.h>  /* Garante que a biblioteca de tradução será usada */
+ 
 
 #include <errno.h>
 #include <getopt.h>
@@ -34,7 +37,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stddef.h>
-#include <libintl.h>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/list.h>
