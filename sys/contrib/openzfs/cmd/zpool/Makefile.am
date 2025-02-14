@@ -1,3 +1,7 @@
+LDFLAGS+= -L/usr/local/lib -lintl
+LDLIBS+= -lintl
+CFLAGS+= -I/usr/local/include
+
 zpool_CFLAGS  = $(AM_CFLAGS)
 zpool_CFLAGS += $(LIBBLKID_CFLAGS) $(LIBUUID_CFLAGS)
 
